@@ -22,13 +22,15 @@ class Thread_Options {
 };
 
 void dirty_pages(Thread_Options t_opts) {
-	register int tmp = 0;
-	size_t page_elements = t_opts.page_size / sizeof(*t_opts.buffer);
-	for(size_t i = t_opts.from; i < t_opts.to * page_elements; i += page_elements) {
-		tmp += t_opts.buffer[i];
-		t_opts.buffer[i] = tmp;
-		printf("[%i] accessing 0x%08zx  (page no. %zu)\n", t_opts.tid, i, i / page_elements);
-		fflush(stdout);
+        for(;;){
+		register int tmp = 0;
+		size_t page_elements = t_opts.page_size / sizeof(*t_opts.buffer);
+		for(size_t i = t_opts.from; i < t_opts.to * page_elements; i += page_elements) {
+			tmp += t_opts.buffer[i];
+			t_opts.buffer[i] = tmp;
+			printf("[%i] accessing 0x%08zx  (page no. %zu)\n", t_opts.tid, i, i / page_elements);
+			fflush(stdout);
+		}
 	}
 }
 
