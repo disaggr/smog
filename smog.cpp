@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
 
 	if(vm.count("help")) {
 		std::cout << description << std::endl;
+		return 0;
 	}
 
 	if(vm.count("threads")) {
