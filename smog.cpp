@@ -7,6 +7,16 @@
 #include <cstring>
 #include <boost/program_options.hpp>
 
+#include <chrono>
+#include <sys/time.h>
+#include <ctime>
+#include <iostream>
+
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::system_clock;
+
+
 namespace popts = boost::program_options;
 
 class Thread_Options {
@@ -21,6 +31,13 @@ class Thread_Options {
 		int *buffer;
 };
 
+long double get_unixtime(){
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (long double)tv.tv_sec+(long double)(tv.tv_usec)/1e6;
+
+}
+
 void dirty_pages(Thread_Options t_opts) {
         for(;;){
 		register int tmp = 0;
@@ -28,7 +45,7 @@ void dirty_pages(Thread_Options t_opts) {
 		for(size_t i = t_opts.from; i < t_opts.to * page_elements; i += page_elements) {
 			tmp += t_opts.buffer[i];
 			t_opts.buffer[i] = tmp;
-			printf("[%i] accessing 0x%08zx  (page no. %zu)\n", t_opts.tid, i, i / page_elements);
+			printf("[%Lf][%i] accessing 0x%08zx  (page no. %zu)\n", get_unixtime(),t_opts.tid, i, i / page_elements);
 			fflush(stdout);
 		}
 	}
