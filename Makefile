@@ -1,5 +1,5 @@
-CC=g++
-CFLAGS=-lboost_program_options -lstdc++ -lpthread
+CXX=g++
+CXXFLAGS=-lboost_program_options -lstdc++ -lpthread -Wall -Wextra -g
 
 smog: smog.cpp
-	$(CC) -o smog smog.cpp $(CFLAGS)
+	$(CXX) -o smog smog.cpp $(CXXFLAGS)
