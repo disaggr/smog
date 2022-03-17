@@ -10,6 +10,16 @@
 #include <errno.h>
 #include <time.h>
 
+#include <chrono>
+#include <sys/time.h>
+#include <ctime>
+#include <iostream>
+
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::system_clock;
+
+
 namespace popts = boost::program_options;
 
 // globals
@@ -31,6 +41,13 @@ class Thread_Options {
 		size_t page_count;
 		void *page_buffer;
 };
+
+long double get_unixtime(){
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (long double)tv.tv_sec+(long double)(tv.tv_usec)/1e6;
+
+}
 
 void dirty_pages(Thread_Options t_opts) {
 	int work_items = t_opts.page_count;
