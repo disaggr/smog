@@ -64,11 +64,12 @@ int main(int argc, char* argv[]) {
 
 	// per default, spawn one SMOG thread per core
 	size_t default_threads = hardware_concurrency;
-	// per default, allocate half of the available memory pages for SMOG
-	size_t default_pages = system_pages / 2;
+	// per default, allocate 2 GiB in memory pages for SMOG
+	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / page_size, system_pages / 2);
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
 
+	std::cout << "System page size: " << page_size  << " Bytes" << std::endl;
 	// parse CLI options
 	popts::options_description description("SMOG Usage");
 	description.add_options()
