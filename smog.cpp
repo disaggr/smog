@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
-		("rate,r", popts::value<size_t>()->default_value(0), "Target dirty rate to automatically adjust delay");
+		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay");
 
 	popts::variables_map vm;
 	popts::store(popts::command_line_parser(argc, argv).options(description).run(), vm);
@@ -126,7 +126,44 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(vm.count("rate")) {
-		target_rate = vm["rate"].as<size_t>();
+		std::string target_rate_str = vm["rate"].as<std::string>();
+
+
+		if (target_rate_str.back() == 'B') {
+			// determine possible size suffix
+			target_rate_str.pop_back();
+			size_t multiplier = 1000;
+			if (target_rate_str.back() == 'i') {
+				// SI units
+				multiplier = 1024;
+				target_rate_str.pop_back();
+			}
+			// determine magnitude
+			size_t size_unit = 1;
+			switch (target_rate_str.back()) {
+			case 'K':
+				size_unit = multiplier;
+				break;
+			case 'M':
+				size_unit = multiplier * multiplier;
+				break;
+			case 'G':
+				size_unit = multiplier * multiplier * multiplier;
+				break;
+			case 'T':
+				size_unit = multiplier * multiplier * multiplier * multiplier;
+				break;
+			default:
+				std::cerr << "error: " << vm["rate"].as<std::string>() << ": unrecognized unit specifier: " << target_rate_str.back() << std::endl;
+				return 1;
+			}
+			target_rate = strtoll(target_rate_str.c_str(), NULL, 0) * size_unit / page_size;
+			std::cout << "  target dirty rate: " << vm["rate"].as<std::string>() << " (" << target_rate << " pages/s)" << std::endl;
+		} else {
+			// otherwise, interpret as pages/s
+			target_rate = strtoll(target_rate_str.c_str(), NULL, 0);
+			std::cout << "  target dirty rate: " << target_rate << " pages/s" << std::endl;
+		}
 	}
 
 	// allocate global SMOG page buffer
