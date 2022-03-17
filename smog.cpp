@@ -55,6 +55,7 @@ int main(int argc, char* argv[]) {
 	size_t system_pages = 0;
 	size_t smog_pages = 0;
 	size_t hardware_concurrency = 0;
+	size_t target_rate = 0; // pages/s
 
 	// determine system characteristics
 	system_pages = sysconf(_SC_PHYS_PAGES);
@@ -74,7 +75,8 @@ int main(int argc, char* argv[]) {
 		("help,h", "Display this help message")
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
-		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration");
+		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
+		("rate,r", popts::value<size_t>()->default_value(0), "Target dirty rate to automatically adjust delay");
 
 	popts::variables_map vm;
 	popts::store(popts::command_line_parser(argc, argv).options(description).run(), vm);
@@ -97,6 +99,10 @@ int main(int argc, char* argv[]) {
 
 	if(vm.count("delay")) {
 		smog_delay = vm["delay"].as<size_t>();
+	}
+
+	if(vm.count("rate")) {
+		target_rate = vm["rate"].as<size_t>();
 	}
 
 	// allocate global SMOG page buffer
@@ -137,6 +143,9 @@ int main(int argc, char* argv[]) {
 	}
 
 	size_t monitor_delay = 1000; // ms
+	size_t monitor_ticks = 0;
+	int phase = 0; // dynamic ramp up
+
 	std::chrono::steady_clock::time_point prev = std::chrono::steady_clock::now();
 
 	while (1) {
@@ -156,10 +165,60 @@ int main(int argc, char* argv[]) {
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * page_size / 1024 / 1024) << " MiB/s";
 			std::cout << ", per item: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
 		}
+		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";
-		std::cout << " at " << (sum * 1.0 / elapsed.count()) << " pages/s";
+		std::cout << " at " << current_rate << " pages/s";
 		std::cout << ", " << (sum * 1.0 / elapsed.count() * page_size / 1024 / 1024) << " MiB/s";
+		if (target_rate) {
+			std::cout << " (" << (100.0 * current_rate / target_rate) << "%)";
+		}
 		std::cout << ", per item: " << elapsed.count() * 1000000000 / sum * threads << " nanoseconds" << std::endl;
+
+		if (target_rate) {
+			// assuming a linear relationship between delay and dirty rate, the following equation holds:
+			//
+			//  current rate      target delay
+			//  ------------  =  -------------
+			//   target rate     current delay
+			//
+			// consequently, we can compensate for a deviation from the target dirty rate by adjusting
+			// the new delay value to:
+			//
+			//                 current rate
+			//  target delay = ------------ * current delay
+			//                  target rate
+			//
+			// assuming that all values are > 0.
+			// for a smoother transition, we will adjust the new delay to:
+			//
+			//              current delay + target delay
+			//  new delay = ----------------------------
+			//                           2
+			//
+			// However, for a faster initial approximation, the ramp up phase is applied without smoothing,
+			// until an epsilon of 0.05 tolerance is achieved.
+			//
+			size_t current_delay = smog_delay;
+			double target_delay = current_rate * current_delay / target_rate;
+
+			if (phase == 0) {
+				double epsilon = 0.05;
+				if (abs(target_delay - current_delay) < target_delay * epsilon) {
+					std::cout << "  reached target range after " << monitor_ticks << " ticks" << std::endl;
+					phase = 1;
+				}
+			}
+
+			if (phase == 0) {
+				smog_delay = target_delay;
+			} else {
+				smog_delay = (target_delay + current_delay) / 2;
+			}
+
+			std::cout << "  adjusting delay: " << current_delay << " -> " << smog_delay << " (by " << (int)(smog_delay - current_delay) << ")" << std::endl;
+		}
+
+		monitor_ticks++;
 	}
 
 	for(size_t i = 0; i < threads; i++) {
