@@ -236,9 +236,9 @@ int main(int argc, char* argv[]) {
 			}
 
 			if (phase == 0) {
-				smog_delay = target_delay;
+				smog_delay = std::max(target_delay, (double) 1);
 			} else {
-				smog_delay = (target_delay + current_delay) / 2;
+				smog_delay = std::max( (target_delay + current_delay) / 2, (double) 1);
 			}
 
 			std::cout << "  adjusting delay: " << current_delay << " -> " << smog_delay << " (by " << (int)(smog_delay - current_delay) << ")" << std::endl;
