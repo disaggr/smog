@@ -25,6 +25,7 @@ namespace popts = boost::program_options;
 // globals
 size_t page_size;
 size_t smog_delay;
+bool measuring = false;
 
 struct thread_status_t {
 	size_t count;
@@ -54,6 +55,11 @@ void dirty_pages(Thread_Options t_opts) {
 
 	while (1) {
 		for(size_t i = 0; i < work_items * page_size; i += page_size) {
+			// Here I am assuming the impact of skipping a few pages is not
+			// going to be a big issue
+			if (measuring) {
+				continue;
+			}
 			int tmp = *(int*)((uintptr_t)t_opts.page_buffer + i);
 			*(int*)((uintptr_t)t_opts.page_buffer + i) = tmp + 1;
 
@@ -167,7 +173,9 @@ int main(int argc, char* argv[]) {
 	std::chrono::steady_clock::time_point prev = std::chrono::steady_clock::now();
 
 	while (1) {
+		measuring = false;
 		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_delay));
+		measuring = true;
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - prev);
 		prev = now;
@@ -179,7 +187,7 @@ int main(int argc, char* argv[]) {
 			sum += work_items;
 			thread_status[i].count = 0;
 			std::cout << "[" << i << "] touched " << work_items << " pages";
-			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " pages/s";
+			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " pages/s, elapsed: " << elapsed.count();
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * page_size / 1024 / 1024) << " MiB/s";
 			std::cout << ", per item: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
 		}
