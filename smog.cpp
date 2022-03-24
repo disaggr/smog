@@ -30,7 +30,7 @@ struct thread_status_t {
 	size_t count;
 };
 
-volatile struct thread_status_t *thread_status;
+struct thread_status_t *thread_status;
 
 class Thread_Options {
 	public:
@@ -57,14 +57,13 @@ void dirty_pages(Thread_Options t_opts) {
 			int tmp = *(int*)((uintptr_t)t_opts.page_buffer + i);
 			*(int*)((uintptr_t)t_opts.page_buffer + i) = tmp + 1;
 
+			thread_status[t_opts.tid].count += 1;
+
 			volatile uint64_t delay = 0;
 			for(size_t j = 0; j < smog_delay; j++) {
 				 delay += 1;
 			}
 		}
-		// Moved from the inner loop body because of severe race conditions with the monitor thread.
-		// In the outer loop this issue is not present anymore.
-		thread_status[t_opts.tid].count += work_items;
 	}
 }
 
