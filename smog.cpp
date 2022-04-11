@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
 
-	std::cout << "System page size: " << page_size  << " Bytes" << std::endl;
+	std::cout << "System page size: " << page_size << " Bytes" << std::endl;
 	// parse CLI options
 	popts::options_description description("SMOG Usage");
 	description.add_options()
@@ -235,7 +235,20 @@ int main(int argc, char* argv[]) {
 		if (target_rate) {
 			std::cout << " (" << (100.0 * current_rate / target_rate) << "%)";
 		}
-		std::cout << ", per item: " << elapsed.count() * 1000000000 / sum * threads << " nanoseconds" << std::endl;
+		std::cout << ", per item: " << elapsed.count() * 1000000000 / sum * threads << " nanoseconds";
+		if (current_rate > smog_pages) {
+			// If the rate of pages/s exceeds the amount of available pages, then pages are touched
+			// multiple times per second. this changes the effectiveness of the smog dirty rate and
+			// is reported as a metric of 'overpaging', if present.
+			//
+			// Overpaging in this context is a percentage of pages touched per second in the last
+			// measuring interval that exceed the number of allocated pages for dirtying.
+			//
+			// For example, a smog run on 10000 allocated pages that touched 20000 pages per second
+			// would be reported as 100% overpaging by the code below.
+			std::cout << ", Overpaging: " << (100.0 * (current_rate / smog_pages - 1)) << "%";
+		}
+		std::cout << std::endl;
 
 		if (target_rate) {
 			// assuming a linear relationship between delay and dirty rate, the following equation holds:
