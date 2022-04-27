@@ -25,6 +25,7 @@ namespace popts = boost::program_options;
 // globals
 size_t page_size;
 size_t smog_delay;
+size_t smog_timeout;
 bool measuring = false;
 
 struct thread_status_t {
@@ -91,6 +92,8 @@ int main(int argc, char* argv[]) {
 	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / page_size, system_pages / 2);
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
+	// per default, keep self-adjusting
+	size_t default_timeout = 0; // s
 
 	std::cout << "System page size: " << page_size << " Bytes" << std::endl;
 	// parse CLI options
@@ -100,7 +103,8 @@ int main(int argc, char* argv[]) {
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
-		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay");
+		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
+		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment");
 
 	popts::variables_map vm;
 	popts::store(popts::command_line_parser(argc, argv).options(description).run(), vm);
@@ -127,7 +131,6 @@ int main(int argc, char* argv[]) {
 
 	if(vm.count("rate")) {
 		std::string target_rate_str = vm["rate"].as<std::string>();
-
 
 		if (target_rate_str.back() == 'B') {
 			// determine possible size suffix
@@ -164,6 +167,10 @@ int main(int argc, char* argv[]) {
 			target_rate = strtoll(target_rate_str.c_str(), NULL, 0);
 			std::cout << "  target dirty rate: " << target_rate << " pages/s" << std::endl;
 		}
+	}
+
+	if(vm.count("adjust-timeout")) {
+		smog_timeout = vm["adjust-timeout"].as<size_t>();
 	}
 
 	// allocate global SMOG page buffer
@@ -203,11 +210,16 @@ int main(int argc, char* argv[]) {
 		t_obj[i] = std::thread(dirty_pages, topts[i]);
 	}
 
+	const int PHASE_DYNAMIC_RAMP_UP = 0;
+	const int PHASE_STEADY_ADJUST   = 1;
+	const int PHASE_CONSTANT_DELAY  = 2;
+
 	size_t monitor_delay = 1000; // ms
 	size_t monitor_ticks = 0;
-	int phase = 0; // dynamic ramp up
+	int phase = PHASE_DYNAMIC_RAMP_UP;
 
-	std::chrono::steady_clock::time_point prev = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::time_point prev = start;
 
 	while (1) {
 		measuring = false;
@@ -277,21 +289,30 @@ int main(int argc, char* argv[]) {
 			size_t current_delay = smog_delay;
 			double target_delay = current_rate * current_delay / target_rate;
 
-			if (phase == 0) {
-				double epsilon = 0.05;
-				if (abs(target_delay - current_delay) < target_delay * epsilon) {
-					std::cout << "  reached target range after " << monitor_ticks << " ticks" << std::endl;
-					phase = 1;
+			if (phase < PHASE_CONSTANT_DELAY) {
+
+				if (phase == PHASE_DYNAMIC_RAMP_UP) {
+					double epsilon = 0.05;
+					if (abs(target_delay - current_delay) < target_delay * epsilon) {
+						std::cout << "  reached target range after " << monitor_ticks << " ticks" << std::endl;
+						phase = PHASE_STEADY_ADJUST;
+					}
+				}
+
+				if (phase == PHASE_DYNAMIC_RAMP_UP) {
+					smog_delay = std::max(target_delay, 1.0);
+				} else {
+					smog_delay = std::max((target_delay + current_delay) / 2.0, 1.0);
+				}
+
+				std::cout << "  adjusting delay: " << current_delay << " -> " << smog_delay << " (by " << (int)(smog_delay - current_delay) << ")" << std::endl;
+
+				std::chrono::duration<double> total_elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start);
+				if (smog_timeout > 0 && total_elapsed >= std::chrono::seconds(smog_timeout)) {
+					std::cout << "  reached adjustment timeout after " << monitor_ticks << " ticks" << std::endl;
+					phase = PHASE_CONSTANT_DELAY;
 				}
 			}
-
-			if (phase == 0) {
-				smog_delay = std::max(target_delay, (double) 1);
-			} else {
-				smog_delay = std::max( (target_delay + current_delay) / 2, (double) 1);
-			}
-
-			std::cout << "  adjusting delay: " << current_delay << " -> " << smog_delay << " (by " << (int)(smog_delay - current_delay) << ")" << std::endl;
 		}
 
 		monitor_ticks++;
