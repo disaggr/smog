@@ -14,11 +14,11 @@ void insert_node( struct node *index, struct node *insertee) {
 	index->next = insertee;
 }
 
-void pointer_chase_init(Thread_Options t_opts)
+void pointer_chase_init(void *thread_buffer, size_t thread_pages)
 {
-	struct node* list = (struct node*) t_opts.page_buffer;
-	uint64_t elements = t_opts.page_count * page_size / CACHE_LINE_SIZE;
-	for(uint64_t i = 1; i < elements - 2; i++){
+	struct node* list = (struct node*) thread_buffer;
+	uint64_t elements = thread_pages * page_size / CACHE_LINE_SIZE;
+	for(uint64_t i = 1; i < elements - 1; i++){
 		list[i].prev = &list[i - 1];
 		list[i].next = &list[i + 1];
 	}

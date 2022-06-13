@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
 				break;
 			case 'p':
 				thread_func = &pointer_chase;
-				pointer_chase_init(topts[i]);
+				pointer_chase_init(thread_buffer, thread_pages);
 				break;
 			case 'c':
 				thread_func = &cold;
@@ -196,7 +196,7 @@ int main(int argc, char* argv[]) {
 				thread_func = &dirty_pages;
 				break;
 			default:
-				std::cout << "Unknown kernel, must be one of: l, r, p, c, t" << std::endl;
+				std::cout << "Unknown kernel, must be one of: l, r, p, c, d" << std::endl;
 				return 0;
 		}
 

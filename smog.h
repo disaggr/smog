@@ -6,6 +6,7 @@
 #include <ctime>
 
 // globals
+#define CACHE_LINE_SIZE 128
 extern size_t page_size;
 extern size_t smog_delay;
 extern size_t smog_timeout;
