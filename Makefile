@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-lboost_program_options -lstdc++ -lpthread -Wall -Wextra -g
+CXXFLAGS=-I. -lboost_program_options -lstdc++ -lpthread -Wall -Wextra -g
 
-smog: smog.cpp
-	$(CXX) -o smog smog.cpp $(CXXFLAGS)
+smog: smog.o linear_scan.o random_access.o pointer_chase.o cold.o dirty_pages.o
+	$(CXX) -o smog smog.o linear_scan.o random_access.o pointer_chase.o cold.o dirty_pages.o $(CXXFLAGS)

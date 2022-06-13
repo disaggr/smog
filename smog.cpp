@@ -8,12 +8,14 @@
 #include <boost/program_options.hpp>
 #include <chrono>
 #include <errno.h>
-#include <time.h>
-
-#include <chrono>
-#include <sys/time.h>
-#include <ctime>
 #include <iostream>
+
+#include "smog.h"
+#include "linear_scan.h"
+#include "random_access.h"
+#include "pointer_chase.h"
+#include "cold.h"
+#include "dirty_pages.h"
 
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
@@ -28,54 +30,17 @@ size_t smog_delay;
 size_t smog_timeout;
 bool measuring = false;
 
-struct thread_status_t {
-	size_t count;
-};
-
 struct thread_status_t *thread_status;
 
-class Thread_Options {
-	public:
-		Thread_Options(int tid, size_t page_count, void *page_buffer) :
-			tid(tid), page_count(page_count), page_buffer(page_buffer)
-		{}
-		int tid;
-		size_t page_count;
-		void *page_buffer;
-};
-
-long double get_unixtime(){
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	return (long double)tv.tv_sec+(long double)(tv.tv_usec)/1e6;
-
-}
-
-void dirty_pages(Thread_Options t_opts) {
-	int work_items = t_opts.page_count;
-
-	while (1) {
-		for(size_t i = 0; i < work_items * page_size; i += page_size) {
-			// Here I am assuming the impact of skipping a few pages is not
-			// going to be a big issue
-			if (measuring) {
-				continue;
-			}
-			int tmp = *(int*)((uintptr_t)t_opts.page_buffer + i);
-			*(int*)((uintptr_t)t_opts.page_buffer + i) = tmp + 1;
-
-			thread_status[t_opts.tid].count += 1;
-
-			volatile uint64_t delay = 0;
-			for(size_t j = 0; j < smog_delay; j++) {
-				 delay += 1;
-			}
-		}
-	}
+long double get_unixtime() {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return (long double)tv.tv_sec+(long double)(tv.tv_usec)/1e6;
 }
 
 int main(int argc, char* argv[]) {
 	size_t threads = 0;
+	std::vector<char> kernels = {};
 	size_t system_pages = 0;
 	size_t smog_pages = 0;
 	size_t hardware_concurrency = 0;
@@ -101,6 +66,7 @@ int main(int argc, char* argv[]) {
 	description.add_options()
 		("help,h", "Display this help message")
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
+		("kernels,k", popts::value<std::vector<char>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, (p)ointerchase, (c)old, (d)irty pages")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
@@ -119,6 +85,14 @@ int main(int argc, char* argv[]) {
 
 	if(vm.count("threads")) {
 		threads = vm["threads"].as<size_t>();
+	}
+
+	if(vm.count("kernels")) {
+		kernels = vm["kernels"].as<std::vector<char>>();
+		if(kernels.size() != threads) {
+			std::cout << "Number of kernels and threads must match." << std::endl;
+			return 0;
+		}
 	}
 
 	if(vm.count("pages")) {
@@ -203,11 +177,33 @@ int main(int argc, char* argv[]) {
 		size_t thread_pages = pages_end - pages_begin + 1;
 		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * page_size);
 		thread_status[i].count = 0;
+		void (*thread_func)(Thread_Options);
+		switch(kernels[i]) {
+			case 'l':
+				thread_func = &linear_scan;
+				break;
+			case 'r':
+				thread_func = &random_access;
+				break;
+			case 'p':
+				thread_func = &pointer_chase;
+				pointer_chase_init(topts[i]);
+				break;
+			case 'c':
+				thread_func = &cold;
+				break;
+			case 'd':
+				thread_func = &dirty_pages;
+				break;
+			default:
+				std::cout << "Unknown kernel, must be one of: l, r, p, c, t" << std::endl;
+				return 0;
+		}
 
 		std::cout << "  creating SMOG thread #" << i << " with " << thread_pages << " pages (" << pages_begin << "--" << pages_end << ")" << std::endl;
 
 		topts.push_back(Thread_Options(i, thread_pages, thread_buffer));
-		t_obj[i] = std::thread(dirty_pages, topts[i]);
+		t_obj[i] = std::thread(thread_func, topts[i]);
 	}
 
 	const int PHASE_DYNAMIC_RAMP_UP = 0;
@@ -235,10 +231,10 @@ int main(int argc, char* argv[]) {
 			size_t work_items = thread_status[i].count;
 			sum += work_items;
 			thread_status[i].count = 0;
-			std::cout << "[" << i << "] touched " << work_items << " pages";
-			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " pages/s, elapsed: " << elapsed.count();
+			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
+			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count();
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * page_size / 1024 / 1024) << " MiB/s";
-			std::cout << ", per item: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
+			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";
