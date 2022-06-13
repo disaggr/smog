@@ -184,6 +184,7 @@ int main(int argc, char* argv[]) {
 				break;
 			case 'r':
 				thread_func = &random_access;
+				random_access_init(thread_buffer, thread_pages);
 				break;
 			case 'p':
 				thread_func = &pointer_chase;
