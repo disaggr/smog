@@ -12,8 +12,9 @@ extern size_t smog_delay;
 extern size_t smog_timeout;
 extern bool measuring;
 
-struct thread_status_t {
+struct __attribute__((packed)) thread_status_t {
         size_t count;
+	char padding[CACHE_LINE_SIZE - sizeof(size_t)];
 };
 
 extern struct thread_status_t *thread_status;
