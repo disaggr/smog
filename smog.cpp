@@ -31,7 +31,7 @@ size_t g_smog_timeout;
 bool g_measuring = false;
 
 struct thread_status_t *g_thread_status;
-pthread_barrier_t *g_initalization_finished;
+pthread_barrier_t g_initalization_finished;
 
 long double get_unixtime() {
         struct timeval tv;

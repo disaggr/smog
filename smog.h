@@ -12,7 +12,7 @@ extern size_t g_page_size;
 extern size_t g_smog_delay;
 extern size_t g_smog_timeout;
 extern bool g_measuring;
-extern pthread_barrier_t *g_initalization_finished;
+extern pthread_barrier_t g_initalization_finished;
 
 struct __attribute__((packed)) thread_status_t {
         size_t count;
