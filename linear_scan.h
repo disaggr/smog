@@ -1,4 +1,14 @@
 #pragma once
 #include "smog.h"
+#include "kernel.h"
 
-void linear_scan(Thread_Options t_opts);
+class Linear_Scan : Smog_Kernel {
+	public:
+		Linear_Scan() {}
+	protected:
+		virtual void Initialize() {}
+		virtual void Execute_Kernel() {}
+    private:
+        uint64_t *m_buffer;
+        uint64_t m_elements;
+};

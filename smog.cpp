@@ -25,12 +25,13 @@ using std::chrono::system_clock;
 namespace popts = boost::program_options;
 
 // globals
-size_t page_size;
-size_t smog_delay;
-size_t smog_timeout;
-bool measuring = false;
+size_t g_page_size;
+size_t g_smog_delay;
+size_t g_smog_timeout;
+bool g_measuring = false;
 
-struct thread_status_t *thread_status;
+struct thread_status_t *g_thread_status;
+pthread_barrier_t *g_initalization_finished;
 
 long double get_unixtime() {
         struct timeval tv;
@@ -48,19 +49,19 @@ int main(int argc, char* argv[]) {
 
 	// determine system characteristics
 	system_pages = sysconf(_SC_PHYS_PAGES);
-	page_size = sysconf(_SC_PAGE_SIZE);
+	g_page_size = sysconf(_SC_PAGE_SIZE);
 	hardware_concurrency = std::thread::hardware_concurrency();
 
 	// per default, spawn one SMOG thread per core
 	size_t default_threads = hardware_concurrency;
 	// per default, allocate 2 GiB in memory pages for SMOG
-	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / page_size, system_pages / 2);
+	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / g_page_size, system_pages / 2);
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
 	// per default, keep self-adjusting
 	size_t default_timeout = 0; // s
 
-	std::cout << "System page size: " << page_size << " Bytes" << std::endl;
+	std::cout << "System page size: " << g_page_size << " Bytes" << std::endl;
 	// parse CLI options
 	popts::options_description description("SMOG Usage");
 	description.add_options()
@@ -68,6 +69,7 @@ int main(int argc, char* argv[]) {
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
 		("kernels,k", popts::value<std::vector<char>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, (p)ointerchase, (c)old, (d)irty pages")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
+		("allocation-type,a", popts::value<char>(), "Specify if the allocation happens (g)lobally using mmap or thread-(l)ocal using malloc")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
 		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment");
@@ -100,7 +102,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(vm.count("delay")) {
-		smog_delay = vm["delay"].as<size_t>();
+		g_smog_delay = vm["delay"].as<size_t>();
 	}
 
 	if(vm.count("rate")) {
@@ -134,7 +136,7 @@ int main(int argc, char* argv[]) {
 				std::cerr << "error: " << vm["rate"].as<std::string>() << ": unrecognized unit specifier: " << target_rate_str.back() << std::endl;
 				return 1;
 			}
-			target_rate = strtoll(target_rate_str.c_str(), NULL, 0) * size_unit / page_size;
+			target_rate = strtoll(target_rate_str.c_str(), NULL, 0) * size_unit / g_page_size;
 			std::cout << "  target dirty rate: " << vm["rate"].as<std::string>() << " (" << target_rate << " pages/s)" << std::endl;
 		} else {
 			// otherwise, interpret as pages/s
@@ -144,29 +146,25 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(vm.count("adjust-timeout")) {
-		smog_timeout = vm["adjust-timeout"].as<size_t>();
+		g_smog_timeout = vm["adjust-timeout"].as<size_t>();
 	}
 
 	// allocate global SMOG page buffer
-	void *buffer = mmap(NULL, smog_pages * page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	void *buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if(buffer == MAP_FAILED) {
 		std::cout << "mmap failed: " << std::strerror(errno) << std::endl;
 		return 1;
 	}
 	else {
-		std::cout << "  pagesize: " << (page_size >> 10) << "KiB" << std::endl;
-		std::cout << "Allocated " << smog_pages << " pages (" << (smog_pages * (page_size >> 10)) << "KiB)" << std::endl;
-	}
-
-	// prepare page preambles
-	for(size_t i = 0; i < smog_pages; ++i) {
-		*(int*)((uintptr_t)buffer + i * page_size) = 0;
+		std::cout << "  pagesize: " << (g_page_size >> 10) << "KiB" << std::endl;
+		std::cout << "Allocated " << smog_pages << " pages (" << (smog_pages * (g_page_size >> 10)) << "KiB)" << std::endl;
 	}
 
 	// launch SMOG threads
 	std::cout << "Creating " << threads << " SMOG threads" << std::endl;
 
-	thread_status = new struct thread_status_t[threads];
+	g_thread_status = new struct thread_status_t[threads];
+	pthread_barrier_init(&g_initalization_finished, NULL, threads);
 
 	std::vector<std::thread> t_obj(threads);
 	std::vector<Thread_Options> topts;
@@ -175,26 +173,24 @@ int main(int argc, char* argv[]) {
 		size_t pages_begin = std::round(double(smog_pages) / threads * i);
 		size_t pages_end = std::round(double(smog_pages) / threads * (i + 1)) - 1;
 		size_t thread_pages = pages_end - pages_begin + 1;
-		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * page_size);
-		thread_status[i].count = 0;
-		void (*thread_func)(Thread_Options);
+		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * g_page_size);
+		g_thread_status[i].count = 0;
+		Smog_Kernel *kernel;
 		switch(kernels[i]) {
 			case 'l':
-				thread_func = &linear_scan;
+				kernel = new Linear_Scan();
 				break;
 			case 'r':
-				thread_func = &random_access;
-				random_access_init(thread_buffer, thread_pages);
+				kernel = new Random_Access();
 				break;
 			case 'p':
-				thread_func = &pointer_chase;
-				pointer_chase_init(thread_buffer, thread_pages);
+				kernel = new Pointer_Chase();
 				break;
 			case 'c':
-				thread_func = &cold;
+				kernel = new Cold();
 				break;
 			case 'd':
-				thread_func = &dirty_pages;
+				kernel = new Dirty_Pages();
 				break;
 			default:
 				std::cout << "Unknown kernel, must be one of: l, r, p, c, d" << std::endl;
@@ -204,7 +200,7 @@ int main(int argc, char* argv[]) {
 		std::cout << "  creating SMOG thread #" << i << " with " << thread_pages << " pages (" << pages_begin << "--" << pages_end << ")" << std::endl;
 
 		topts.push_back(Thread_Options(i, thread_pages, thread_buffer));
-		t_obj[i] = std::thread(thread_func, topts[i]);
+		t_obj[i] = std::thread(kernel, topts[i]);
 	}
 
 	const int PHASE_DYNAMIC_RAMP_UP = 0;
@@ -219,7 +215,7 @@ int main(int argc, char* argv[]) {
 	std::chrono::steady_clock::time_point prev = start;
 
 	while (1) {
-		measuring = false;
+		g_measuring = false;
 		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_delay));
 		measuring = true;
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -229,18 +225,18 @@ int main(int argc, char* argv[]) {
 		size_t sum = 0;
 
 		for (size_t i = 0; i < threads; ++i) {
-			size_t work_items = thread_status[i].count;
+			size_t work_items = g_thread_status[i].count;
 			sum += work_items;
-			thread_status[i].count = 0;
+			g_thread_status[i].count = 0;
 			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
 			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count();
-			std::cout << ", " << (work_items * 1.0 / elapsed.count() * page_size / 1024 / 1024) << " MiB/s";
+			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
 			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";
 		std::cout << " at " << current_rate << " pages/s";
-		std::cout << ", " << (sum * 1.0 / elapsed.count() * page_size / 1024 / 1024) << " MiB/s";
+		std::cout << ", " << (sum * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
 		if (target_rate) {
 			std::cout << " (" << (100.0 * current_rate / target_rate) << "%)";
 		}
@@ -283,7 +279,7 @@ int main(int argc, char* argv[]) {
 			// However, for a faster initial approximation, the ramp up phase is applied without smoothing,
 			// until an epsilon of 0.05 tolerance is achieved.
 			//
-			size_t current_delay = smog_delay;
+			size_t current_delay = g_smog_delay;
 			double target_delay = current_rate * current_delay / target_rate;
 
 			if (phase < PHASE_CONSTANT_DELAY) {
@@ -305,7 +301,7 @@ int main(int argc, char* argv[]) {
 				std::cout << "  adjusting delay: " << current_delay << " -> " << smog_delay << " (by " << (int)(smog_delay - current_delay) << ")" << std::endl;
 
 				std::chrono::duration<double> total_elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start);
-				if (smog_timeout > 0 && total_elapsed >= std::chrono::seconds(smog_timeout)) {
+				if (g_smog_timeout > 0 && total_elapsed >= std::chrono::seconds(g_smog_timeout)) {
 					std::cout << "  reached adjustment timeout after " << monitor_ticks << " ticks" << std::endl;
 					phase = PHASE_CONSTANT_DELAY;
 				}

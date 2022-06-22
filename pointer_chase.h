@@ -1,4 +1,5 @@
-#include <smog.h>
+#include "smog.h"
+#include "kernel.h"
 
 struct __attribute__((packed)) node {
 	struct node *next;
@@ -6,5 +7,15 @@ struct __attribute__((packed)) node {
   	char padding[CACHE_LINE_SIZE - 2 * sizeof(struct node*)];
 };
 
-void pointer_chase_init(void *thread_buffer, size_t thread_pages);
-void pointer_chase(Thread_Options t_opts);
+class Pointer_Chase : Smog_Kernel {
+	public:
+		Pointer_Chase() {}
+	protected:
+		void Initialize();
+		void Execute_Kernel();
+    private:
+		void Delete_Node( struct node *index);
+		void Insert_Node( struct node *index, struct node *insertee);
+        struct node *m_list;
+        uint64_t m_elements;
+};

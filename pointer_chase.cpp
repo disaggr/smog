@@ -2,60 +2,61 @@
 #include <stdint.h>
 #include <cstdlib>
 
-void delete_node( struct node *index) {
+void Pointer_Chase::Delete_Node( struct node *index) {
 	index->prev->next = index->next;
 	index->next->prev = index->prev;
 }
 
-void insert_node( struct node *index, struct node *insertee) {
+void Pointer_Chase::Insert_Node( struct node *index, struct node *insertee) {
 	index->next->prev = insertee;
 	insertee->next = index->next;
 	insertee->prev = index;
 	index->next = insertee;
 }
 
-void pointer_chase_init(void *thread_buffer, size_t thread_pages)
+void Pointer_Chase::Initialize(void *thread_buffer, size_t thread_pages)
 {
-	struct node* list = (struct node*) thread_buffer;
-	uint64_t elements = thread_pages * page_size / CACHE_LINE_SIZE;
-	for(uint64_t i = 1; i < elements - 1; i++){
-		list[i].prev = &list[i - 1];
-		list[i].next = &list[i + 1];
+	m_list = (struct node*) m_page_buffer;
+	m_elements = m_page_count * g_page_size / CACHE_LINE_SIZE;
+	for(uint64_t i = 1; i < m_elements - 1; i++){
+		m_list[i].prev = &m_list[i - 1];
+		m_list[i].next = &m_list[i + 1];
 	}
 
-	list[0].prev = &list[elements - 1];
-	list[0].next = &list[1];
-	list[elements - 1].prev= &list[elements - 2];
-	list[elements - 1].next = &list[0];
+	m_list[0].prev = &m_list[m_elements - 1];
+	m_list[0].next = &m_list[1];
+	m_list[m_elements - 1].prev= &m_list[m_elements - 2];
+	m_list[m_elements - 1].next = &m_list[0];
 
 	std::srand(std::time(0));
 
 	uint64_t r = 0;
-	for(uint64_t i = 0; i < elements - 1; i++) {
-		r = std::rand() % (elements - 1);
-		delete_node(&list[r]);
-		insert_node(&list[i], &list[r]);
+	for(uint64_t i = 0; i < m_elements - 1; i++) {
+		r = std::rand() % (m_elements - 1);
+		delete_node(&m_list[r]);
+		insert_node(&m_list[i], &m_list[r]);
 	}
 }
 
-void pointer_chase(Thread_Options t_opts) {
-	struct node* list = (struct node*) t_opts.page_buffer;
-	//uint64_t elements = t_opts.page_count * page_size / CACHE_LINE_SIZE;
+void Pointer_Chase::Execute_Kernel() {
 	struct node *tmp = &list[0];
 
 	while (1) {
-                        // Here I am assuming the impact of skipping a few pages is not
-                        // going to be a big issue
-                        if (measuring) {
-                                continue;
-                        }
+			// Here I am assuming the impact of skipping a few pages is not
+			// going to be a big issue
+			if (measuring) {
+				continue;
+			}
 
 			tmp = tmp->next;
-                        thread_status[t_opts.tid].count += 1;
+			tmp = tmp->next;
+			tmp = tmp->next;
+			tmp = tmp->next;
+			g_thread_status[m_tid].count += 4;
 
-                        volatile uint64_t delay = 0;
-                        for(size_t j = 0; j < smog_delay; j++) {
-                                 delay += 1;
-                        }
-        }
+			volatile uint64_t delay = 0;
+			for(size_t j = 0; j < g_smog_delay; j++) {
+				delay += 1;
+			}
+	}
 }

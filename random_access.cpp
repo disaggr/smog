@@ -2,47 +2,37 @@
 #include <cstdlib>
 #include <stdint.h>
 
-#define PARALLEL_ACCESSES 4
-
-struct __attribute__((packed)) random_element {
-	uint64_t randoms[PARALLEL_ACCESSES];
-	uint64_t index;
-	char padding[CACHE_LINE_SIZE - PARALLEL_ACCESSES + 1 * sizeof(uint64_t)];
-};
-
-void random_access_init(void *thread_buffer, size_t thread_pages) {
-	struct random_element *buffer = (struct random_element*) thread_buffer;
-	uint64_t elements = thread_pages * page_size / sizeof(struct random_element);
+void Random_Access::Initialize() {
+	*m_buffer = (struct random_element*) m_page_buffer;
+	elements = m_page_count * g_page_size / sizeof(struct random_element);
 	std::srand(std::time(0));
 
-	for(uint64_t i = 0; i < elements; i++) {
-		buffer[i].index = i;
+	for(uint64_t i = 0; i < m_elements; i++) {
+		m_buffer[i].index = i;
 		for(uint64_t j = 0; j < PARALLEL_ACCESSES; j++)
-			buffer[i].randoms[j] = std::rand() % (elements - 1);
+			m_buffer[i].randoms[j] = std::rand() % (m_elements - 1);
 	}
 }
 
-void random_access(Thread_Options t_opts) {
-	struct random_element *buffer = (struct random_element*) t_opts.page_buffer;
-        uint64_t elements = t_opts.page_count * page_size / sizeof(struct random_element);
+void Random_Access::Execute_Kernel() {
         uint64_t sum = 0;
 
         while (1) {
-                for(uint64_t i = 0; i < elements; i++) {
+                for(uint64_t i = 0; i < m_elements; i++) {
                         // Here I am assuming the impact of skipping a few pages is not
                         // going to be a big issue
                         if (measuring) {
                                 continue;
                         }
 
-                        sum += buffer[ buffer[i].randoms[0] ].index;
-			sum += buffer[ buffer[i].randoms[1] ].index;
-			sum += buffer[ buffer[i].randoms[2] ].index;
-			sum += buffer[ buffer[i].randoms[3] ].index;
-                        thread_status[t_opts.tid].count += 1;
+                        sum += m_buffer[ m_buffer[i].randoms[0] ].index;
+			sum += m_buffer[ m_buffer[i].randoms[1] ].index;
+			sum += m_buffer[ m_buffer[i].randoms[2] ].index;
+			sum += m_buffer[ m_buffer[i].randoms[3] ].index;
+                        g_thread_status[m_id].count += 4;
 
                         volatile uint64_t delay = 0;
-                        for(size_t j = 0; j < smog_delay; j++) {
+                        for(size_t j = 0; j < g_smog_delay; j++) {
                                  delay += 1;
                         }
                 }

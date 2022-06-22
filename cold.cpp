@@ -1,4 +1,7 @@
 #include <cold.h>
 
-void cold(Thread_Options topts) {
+void Cold::Initialize() {
+}
+
+void Cold::Execute_Kernel() {
 }

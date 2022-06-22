@@ -1,9 +1,12 @@
 #include <linear_scan.h>
 #include <stdint.h>
 
-void linear_scan(Thread_Options t_opts) {
-        uint64_t *buffer = (uint64_t*) t_opts.page_buffer;
-        uint64_t elements = t_opts.page_count * page_size / CACHE_LINE_SIZE;
+void Linear_Scan::Initialize() {
+        *m_buffer = (uint64_t*) m_page_buffer;
+        m_elements = t_opts.page_count * page_size / CACHE_LINE_SIZE;
+}
+
+void Linear_Scan::Execute_Kernel() {
 	uint64_t sum = 0;
 
         while (1) {
@@ -18,7 +21,7 @@ void linear_scan(Thread_Options t_opts) {
                         thread_status[t_opts.tid].count += 1;
 
                         volatile uint64_t delay = 0;
-                        for(size_t j = 0; j < smog_delay; j++) {
+                        for(size_t j = 0; j < g_smog_delay; j++) {
                                  delay += 1;
                         }
 		}
