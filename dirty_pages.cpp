@@ -3,14 +3,14 @@
 
 void Dirty_Pages::Initialize() {
 	// prepare page preambles
-        for(size_t i = 0; i < m_work_items; ++i) {
+        for(size_t i = 0; i < m_page_count; ++i) {
                 *(int*)((uintptr_t)m_page_buffer + i * g_page_size) = 0;
         }	
 }
 
 void Dirty_Pages::Execute_Kernel() {
         while (1) {
-                for(size_t i = 0; i < m_work_items * g_page_size; i += g_page_size) {
+                for(size_t i = 0; i < m_page_count * g_page_size; i += g_page_size) {
                         // Here I am assuming the impact of skipping a few pages is not
                         // going to be a big issue
                         if (g_measuring) {

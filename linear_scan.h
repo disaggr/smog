@@ -1,13 +1,14 @@
 #pragma once
 #include "smog.h"
 #include "kernel.h"
+#include <cstdint>
 
-class Linear_Scan : Smog_Kernel {
+class Linear_Scan : public Smog_Kernel {
 	public:
 		Linear_Scan() {}
 	protected:
-		virtual void Initialize() {}
-		virtual void Execute_Kernel() {}
+		void Initialize() override;
+		void Execute_Kernel() override;
     private:
         uint64_t *m_buffer;
         uint64_t m_elements;

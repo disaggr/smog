@@ -3,8 +3,8 @@
 #include <stdint.h>
 
 void Random_Access::Initialize() {
-	*m_buffer = (struct random_element*) m_page_buffer;
-	elements = m_page_count * g_page_size / sizeof(struct random_element);
+	m_buffer = (struct random_element*) m_page_buffer;
+	m_elements = m_page_count * g_page_size / sizeof(struct random_element);
 	std::srand(std::time(0));
 
 	for(uint64_t i = 0; i < m_elements; i++) {
@@ -21,7 +21,7 @@ void Random_Access::Execute_Kernel() {
                 for(uint64_t i = 0; i < m_elements; i++) {
                         // Here I am assuming the impact of skipping a few pages is not
                         // going to be a big issue
-                        if (measuring) {
+                        if (g_measuring) {
                                 continue;
                         }
 

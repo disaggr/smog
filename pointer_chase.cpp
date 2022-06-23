@@ -14,7 +14,7 @@ void Pointer_Chase::Insert_Node( struct node *index, struct node *insertee) {
 	index->next = insertee;
 }
 
-void Pointer_Chase::Initialize(void *thread_buffer, size_t thread_pages)
+void Pointer_Chase::Initialize()
 {
 	m_list = (struct node*) m_page_buffer;
 	m_elements = m_page_count * g_page_size / CACHE_LINE_SIZE;
@@ -33,18 +33,18 @@ void Pointer_Chase::Initialize(void *thread_buffer, size_t thread_pages)
 	uint64_t r = 0;
 	for(uint64_t i = 0; i < m_elements - 1; i++) {
 		r = std::rand() % (m_elements - 1);
-		delete_node(&m_list[r]);
-		insert_node(&m_list[i], &m_list[r]);
+		Delete_Node(&m_list[r]);
+		Insert_Node(&m_list[i], &m_list[r]);
 	}
 }
 
 void Pointer_Chase::Execute_Kernel() {
-	struct node *tmp = &list[0];
+	struct node *tmp = &m_list[0];
 
 	while (1) {
 			// Here I am assuming the impact of skipping a few pages is not
 			// going to be a big issue
-			if (measuring) {
+			if (g_measuring) {
 				continue;
 			}
 
@@ -52,7 +52,7 @@ void Pointer_Chase::Execute_Kernel() {
 			tmp = tmp->next;
 			tmp = tmp->next;
 			tmp = tmp->next;
-			g_thread_status[m_tid].count += 4;
+			g_thread_status[m_id].count += 4;
 
 			volatile uint64_t delay = 0;
 			for(size_t j = 0; j < g_smog_delay; j++) {

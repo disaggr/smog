@@ -2,10 +2,10 @@
 #include "smog.h"
 #include "kernel.h"
 
-class Dirty_Pages : Smog_Kernel {
+class Dirty_Pages : public Smog_Kernel {
 	public:
 		Dirty_Pages() {}
 	protected:
-		virtual void Initialize() {}
-		virtual void Execute_Kernel() {}
+		void Initialize() override;
+		void Execute_Kernel() override;
 };

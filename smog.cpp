@@ -200,7 +200,8 @@ int main(int argc, char* argv[]) {
 		std::cout << "  creating SMOG thread #" << i << " with " << thread_pages << " pages (" << pages_begin << "--" << pages_end << ")" << std::endl;
 
 		topts.push_back(Thread_Options(i, thread_pages, thread_buffer));
-		t_obj[i] = std::thread(kernel, topts[i]);
+		kernel->Configure(topts[i]);
+		t_obj[i] = std::thread(&Smog_Kernel::Run, kernel);
 	}
 
 	const int PHASE_DYNAMIC_RAMP_UP = 0;
@@ -217,7 +218,7 @@ int main(int argc, char* argv[]) {
 	while (1) {
 		g_measuring = false;
 		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_delay));
-		measuring = true;
+		g_measuring = true;
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - prev);
 		prev = now;
@@ -293,12 +294,12 @@ int main(int argc, char* argv[]) {
 				}
 
 				if (phase == PHASE_DYNAMIC_RAMP_UP) {
-					smog_delay = std::max(target_delay, 1.0);
+					g_smog_delay = std::max(target_delay, 1.0);
 				} else {
-					smog_delay = std::max((target_delay + current_delay) / 2.0, 1.0);
+					g_smog_delay = std::max((target_delay + current_delay) / 2.0, 1.0);
 				}
 
-				std::cout << "  adjusting delay: " << current_delay << " -> " << smog_delay << " (by " << (int)(smog_delay - current_delay) << ")" << std::endl;
+				std::cout << "  adjusting delay: " << current_delay << " -> " << g_smog_delay << " (by " << (int)(g_smog_delay - current_delay) << ")" << std::endl;
 
 				std::chrono::duration<double> total_elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start);
 				if (g_smog_timeout > 0 && total_elapsed >= std::chrono::seconds(g_smog_timeout)) {
