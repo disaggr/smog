@@ -13,6 +13,7 @@
 #include "smog.h"
 #include "linear_scan.h"
 #include "random_access.h"
+#include "random_write.h"
 #include "pointer_chase.h"
 #include "cold.h"
 #include "dirty_pages.h"
@@ -67,7 +68,7 @@ int main(int argc, char* argv[]) {
 	description.add_options()
 		("help,h", "Display this help message")
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
-		("kernels,k", popts::value<std::vector<char>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, (p)ointerchase, (c)old, (d)irty pages")
+		("kernels,k", popts::value<std::vector<char>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, random (w)rite, (p)ointerchase, (c)old, (d)irty pages")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
 		("allocation-type,a", popts::value<char>(), "Specify if the allocation happens (g)lobally using mmap or thread-(l)ocal using malloc")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
@@ -182,6 +183,9 @@ int main(int argc, char* argv[]) {
 				break;
 			case 'r':
 				kernel = new Random_Access();
+				break;
+			case 'w':
+				kernel = new Random_Write();
 				break;
 			case 'p':
 				kernel = new Pointer_Chase();
