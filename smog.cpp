@@ -9,6 +9,7 @@
 #include <chrono>
 #include <errno.h>
 #include <iostream>
+#include <fcntl.h>
 
 #include "smog.h"
 #include "linear_scan.h"
@@ -73,7 +74,8 @@ int main(int argc, char* argv[]) {
 		("allocation-type,a", popts::value<char>(), "Specify if the allocation happens (g)lobally using mmap or thread-(l)ocal using malloc")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
-		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment");
+		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment")
+		("file-backing,f", popts::value<std::string>(), "Location of file used for mmap");
 
 	popts::variables_map vm;
 	popts::store(popts::command_line_parser(argc, argv).options(description).run(), vm);
@@ -151,7 +153,22 @@ int main(int argc, char* argv[]) {
 	}
 
 	// allocate global SMOG page buffer
-	void *buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	void *buffer;
+	if(vm.count("file-backing")) {
+		std::string file_backing = std::string(vm["file-backing"].as<std::string>());
+		int fd;
+		if ((fd = open(file_backing.c_str(), O_RDWR|O_SYNC)) < 0 ) {
+			std::cout << "open failed: " << std::strerror(errno) << std::endl;
+			close(fd);
+			return 1;
+		}
+		buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, fd, 0);
+		close(fd);
+	}
+	else {
+		buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	}
+
 	if(buffer == MAP_FAILED) {
 		std::cout << "mmap failed: " << std::strerror(errno) << std::endl;
 		return 1;
@@ -179,22 +196,22 @@ int main(int argc, char* argv[]) {
 		Smog_Kernel *kernel;
 		switch(kernels[i]) {
 			case 'l':
-				kernel = new Linear_Scan();
+				kernel = new Linear_Scan(true);
 				break;
 			case 'r':
-				kernel = new Random_Access();
+				kernel = new Random_Access(true);
 				break;
 			case 'w':
-				kernel = new Random_Write();
+				kernel = new Random_Write(true);
 				break;
 			case 'p':
-				kernel = new Pointer_Chase();
+				kernel = new Pointer_Chase(true);
 				break;
 			case 'c':
-				kernel = new Cold();
+				kernel = new Cold(true);
 				break;
 			case 'd':
-				kernel = new Dirty_Pages();
+				kernel = new Dirty_Pages(true);
 				break;
 			default:
 				std::cout << "Unknown kernel, must be one of: l, r, p, c, d" << std::endl;

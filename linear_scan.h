@@ -5,11 +5,7 @@
 
 class Linear_Scan : public Smog_Kernel {
 	public:
-		Linear_Scan() {}
+		Linear_Scan(bool initialize) : Smog_Kernel(initialize) {}
 	protected:
-		void Initialize() override;
 		void Execute_Kernel() override;
-    private:
-        uint64_t *m_buffer;
-        uint64_t m_elements;
 };
