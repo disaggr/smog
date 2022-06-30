@@ -4,7 +4,7 @@
 
 class Cold : public Smog_Kernel {
 	public:
-		Cold(bool initialize) : Smog_Kernel(initialize) {}
+		Cold(bool initialize) : Smog_Kernel(initialize, false) {}
 	protected:
 		void Execute_Kernel() override;
 };

@@ -13,9 +13,7 @@ void Smog_Kernel::Insert_Node( struct element *index, struct element *insertee) 
 	index->next = insertee;
 }
 
-void Smog_Kernel::Initialize() {
-	m_buffer = (struct element*) m_page_buffer;
-	m_elements = m_page_count * g_page_size / sizeof(struct element);
+void Smog_Kernel::Initialize(bool shuffle) {
 	std::srand(std::time(0));
 
 	for(uint64_t i = 0; i < m_elements; i++) {
@@ -41,10 +39,12 @@ void Smog_Kernel::Initialize() {
 	m_buffer[m_elements - 1].prev= &m_buffer[m_elements - 2];
 	m_buffer[m_elements - 1].next = &m_buffer[0];
 
-	uint64_t r = 0;
-	for(uint64_t i = 0; i < m_elements - 1; i++) {
-		r = std::rand() % (m_elements - 1);
-		Delete_Node(&m_buffer[r]);
-		Insert_Node(&m_buffer[i], &m_buffer[r]);
+	if(shuffle) {
+		uint64_t r = 0;
+		for(uint64_t i = 0; i < m_elements - 1; i++) {
+			r = std::rand() % (m_elements - 1);
+			Delete_Node(&m_buffer[r]);
+			Insert_Node(&m_buffer[i], &m_buffer[r]);
+		}
 	}
 }

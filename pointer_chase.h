@@ -4,7 +4,7 @@
 
 class Pointer_Chase : public Smog_Kernel {
 	public:
-		Pointer_Chase(bool initialize) : Smog_Kernel(initialize) {}
+		Pointer_Chase(bool initialize) : Smog_Kernel(initialize, true) {}
 	protected:
 		void Execute_Kernel() override;
     private:

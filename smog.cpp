@@ -43,7 +43,9 @@ long double get_unixtime() {
 
 int main(int argc, char* argv[]) {
 	size_t threads = 0;
+	std::vector<std::string> kernel_groups = {};
 	std::vector<char> kernels = {};
+	
 	size_t system_pages = 0;
 	size_t smog_pages = 0;
 	size_t hardware_concurrency = 0;
@@ -69,7 +71,7 @@ int main(int argc, char* argv[]) {
 	description.add_options()
 		("help,h", "Display this help message")
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
-		("kernels,k", popts::value<std::vector<char>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, random (w)rite, (p)ointerchase, (c)old, (d)irty pages")
+		("kernels,k", popts::value<std::vector<std::string>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, random (w)rite, (p)ointerchase, (c)old, (d)irty pages")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
 		("allocation-type,a", popts::value<char>(), "Specify if the allocation happens (g)lobally using mmap or thread-(l)ocal using malloc")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
@@ -93,8 +95,19 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(vm.count("kernels")) {
-		kernels = vm["kernels"].as<std::vector<char>>();
-		if(kernels.size() != threads) {
+		int size = 0;
+		kernel_groups = vm["kernels"].as<std::vector<std::string>>();
+		for(std::string ks : kernel_groups) {
+			size += ks.size();
+			for(uint64_t i = 0; i < ks.size(); i++) {
+				if(i > 0 && ks[i] == 'p') {
+					std::cout << "If the pointerchase kernel is used, put it at the beginning because. Just this kernel is initialized and pointer chase needs shuffling." << std::endl;
+					return 1;
+				}
+				kernels.push_back(ks[i]);
+			}
+		}
+		if(size != threads) {
 			std::cout << "Number of kernels and threads must match." << std::endl;
 			return 0;
 		}
@@ -182,47 +195,70 @@ int main(int argc, char* argv[]) {
 	std::cout << "Creating " << threads << " SMOG threads" << std::endl;
 
 	g_thread_status = new struct thread_status_t[threads];
-	pthread_barrier_init(&g_initalization_finished, NULL, threads);
+	pthread_barrier_init(&g_initalization_finished, NULL, threads + 1);
 
 	std::vector<std::thread> t_obj(threads);
 	std::vector<Thread_Options> topts;
 
-	for(size_t i = 0; i < threads; i++) {
-		size_t pages_begin = std::round(double(smog_pages) / threads * i);
-		size_t pages_end = std::round(double(smog_pages) / threads * (i + 1)) - 1;
+	int kernel_group_size = kernel_groups.size();
+	int tid = 0;
+	for(size_t i = 0; i < kernel_group_size; i++) {
+		size_t pages_begin = std::round(double(smog_pages) / kernel_group_size * i);
+		size_t pages_end = std::round(double(smog_pages) / kernel_group_size * (i + 1)) - 1;
 		size_t thread_pages = pages_end - pages_begin + 1;
 		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * g_page_size);
-		g_thread_status[i].count = 0;
-		Smog_Kernel *kernel;
-		switch(kernels[i]) {
-			case 'l':
-				kernel = new Linear_Scan(true);
-				break;
-			case 'r':
-				kernel = new Random_Access(true);
-				break;
-			case 'w':
-				kernel = new Random_Write(true);
-				break;
-			case 'p':
-				kernel = new Pointer_Chase(true);
-				break;
-			case 'c':
-				kernel = new Cold(true);
-				break;
-			case 'd':
-				kernel = new Dirty_Pages(true);
-				break;
-			default:
-				std::cout << "Unknown kernel, must be one of: l, r, p, c, d" << std::endl;
-				return 0;
+		for(int k = 0; k < kernel_groups[i].size(); k++) {
+			g_thread_status[i].count = 0;
+			Smog_Kernel *kernel;
+			switch(kernel_groups[i][k]) {
+				case 'l':
+					if(k == 0)
+						kernel = new Linear_Scan(true);
+					else
+						kernel = new Linear_Scan(false);
+					break;
+				case 'r':
+					if(k == 0)
+						kernel = new Random_Access(true);
+					else
+						kernel = new Random_Access(false);
+					break;
+				case 'w':
+					if(k == 0)
+						kernel = new Random_Write(true);
+					else
+						kernel = new Random_Write(false);
+					break;
+				case 'p':
+					if(k == 0)
+						kernel = new Pointer_Chase(true);
+					else
+						kernel = new Pointer_Chase(false);
+					break;
+				case 'c':
+					if(k == 0)
+						kernel = new Cold(true);
+					else
+						kernel = new Cold(false);
+					break;
+				case 'd':
+					if(k == 0)
+						kernel = new Dirty_Pages(true);
+					else
+						kernel = new Dirty_Pages(false);
+					break;
+				default:
+					std::cout << "Unknown kernel, must be one of: l, r, w, p, c, d" << std::endl;
+					return 0;
+			}
+
+			std::cout << "  creating SMOG thread #" << tid << " with " << thread_pages << " pages (" << pages_begin << "--" << pages_end << ")" << std::endl;
+
+			topts.push_back(Thread_Options(tid, thread_pages, thread_buffer));
+			kernel->Configure(topts[tid]);
+			t_obj[tid] = std::thread(&Smog_Kernel::Run, kernel);
+			tid++;
 		}
-
-		std::cout << "  creating SMOG thread #" << i << " with " << thread_pages << " pages (" << pages_begin << "--" << pages_end << ")" << std::endl;
-
-		topts.push_back(Thread_Options(i, thread_pages, thread_buffer));
-		kernel->Configure(topts[i]);
-		t_obj[i] = std::thread(&Smog_Kernel::Run, kernel);
 	}
 
 	const int PHASE_DYNAMIC_RAMP_UP = 0;
@@ -232,6 +268,9 @@ int main(int argc, char* argv[]) {
 	size_t monitor_delay = 1000; // ms
 	size_t monitor_ticks = 0;
 	int phase = PHASE_DYNAMIC_RAMP_UP;
+
+	// sync with worker threads
+	pthread_barrier_wait(&g_initalization_finished);
 
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	std::chrono::steady_clock::time_point prev = start;

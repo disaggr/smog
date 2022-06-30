@@ -15,22 +15,24 @@ struct __attribute__((packed)) element {
 
 class Smog_Kernel {
 	public:
-		Smog_Kernel(bool initialize) : m_initialize(initialize) {}
+		Smog_Kernel(bool initialize, bool shuffle) : m_initialize(initialize), m_shuffle(shuffle) {}
 		void Configure(Thread_Options t_opts) {
 			m_id = t_opts.tid;
 			m_page_count = t_opts.page_count;
 			m_page_buffer = t_opts.page_buffer;
+			m_buffer = (struct element*) m_page_buffer;
+			m_elements = m_page_count * g_page_size / sizeof(struct element);
 			
 		}
 		void Run() {
 			if(m_initialize) {
-				Initialize();
+				Initialize(m_shuffle);
 			}
 			pthread_barrier_wait(&g_initalization_finished);
 			Execute_Kernel();
 		}
 
-		void Initialize();
+		void Initialize(bool shuffle);
 	protected:
 		virtual void Execute_Kernel() = 0;
 		int m_id;
@@ -39,6 +41,7 @@ class Smog_Kernel {
 		struct element *m_buffer;
 		uint64_t m_elements;
 		bool m_initialize;
+		bool m_shuffle;
 	private:
 		void Delete_Node( struct element *index);
 		void Insert_Node( struct element *index, struct element *insertee);
