@@ -7,6 +7,7 @@ void Dirty_Pages::Execute_Kernel() {
                         // Here I am assuming the impact of skipping a few pages is not
                         // going to be a big issue
                         if (g_measuring) {
+                                mem_fence();
                                 continue;
                         }
                         uint64_t tmp = m_buffer[i].index;

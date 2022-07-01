@@ -10,6 +10,7 @@ void Random_Access::Execute_Kernel() {
                         // Here I am assuming the impact of skipping a few pages is not
                         // going to be a big issue
                         if (g_measuring) {
+                                mem_fence();
                                 continue;
                         }
 

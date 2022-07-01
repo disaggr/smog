@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
 			close(fd);
 			return 1;
 		}
-		buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, fd, 0);
+		buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		close(fd);
 	}
 	else {
@@ -289,10 +289,19 @@ int main(int argc, char* argv[]) {
 			size_t work_items = g_thread_status[i].count;
 			sum += work_items;
 			g_thread_status[i].count = 0;
+			mem_fence();
 			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
+			g_thread_status[i].count = 0;
+			mem_fence();
 			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count();
+			g_thread_status[i].count = 0;
+			mem_fence();
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
+			g_thread_status[i].count = 0;
+			mem_fence();
 			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
+			g_thread_status[i].count = 0;
+			mem_fence();
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";
