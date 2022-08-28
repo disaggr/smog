@@ -11,7 +11,6 @@
 extern size_t g_page_size;
 extern size_t g_smog_delay;
 extern size_t g_smog_timeout;
-extern bool g_measuring;
 extern pthread_barrier_t g_initalization_finished;
 
 #if defined(__ppc64__) || defined(__PPC64__)
@@ -24,6 +23,7 @@ struct thread_status_t {
         union {
                 struct {
                         size_t count;
+                        size_t last_count;
                 };
                 char padding[CACHE_LINE_SIZE];
         };

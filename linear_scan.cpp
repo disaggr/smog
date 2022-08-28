@@ -10,13 +10,6 @@ void Linear_Scan::Execute_Kernel() {
         while (1) {
 		//for(uint64_t i = 0; i < elements / 10; i += 10) {
 		for(uint64_t i = 0; i < elements; i++) {
-                        // Here I am assuming the impact of skipping a few pages is not
-                        // going to be a big issue
-                        if (g_measuring) {
-                                mem_fence();
-                                continue;
-                        }
-
                         sum += *(((uint64_t *)m_buffer) + i);
 			/*sum += *(((uint64_t *)m_buffer) + i + 1);
 			sum += *(((uint64_t *)m_buffer) + i + 2);
@@ -29,7 +22,6 @@ void Linear_Scan::Execute_Kernel() {
 			sum += *(((uint64_t *)m_buffer) + i + 9);
                         g_thread_status[m_id].count += 10;*/
 			g_thread_status[m_id].count += 1;
-			mem_fence();
 
                         volatile uint64_t delay = 0;
                         for(size_t j = 0; j < g_smog_delay; j++) {

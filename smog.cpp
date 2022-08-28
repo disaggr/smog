@@ -30,7 +30,6 @@ namespace popts = boost::program_options;
 size_t g_page_size;
 size_t g_smog_delay;
 size_t g_smog_timeout;
-bool g_measuring = false;
 
 struct thread_status_t *g_thread_status;
 pthread_barrier_t g_initalization_finished;
@@ -292,9 +291,7 @@ int main(int argc, char* argv[]) {
 	std::chrono::steady_clock::time_point prev = start;
 
 	while (1) {
-		g_measuring = false;
 		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_interval));
-		g_measuring = true;
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - prev);
 		prev = now;
@@ -302,22 +299,15 @@ int main(int argc, char* argv[]) {
 		size_t sum = 0;
 
 		for (size_t i = 0; i < threads; ++i) {
-			size_t work_items = g_thread_status[i].count;
+			// NOTE: for very fast kernels, this loses us a couple iterations between this line and the next
+			size_t work_items = g_thread_status[i].count - g_thread_status[i].last_count;
+			g_thread_status[i].last_count = g_thread_status[i].count;
+
 			sum += work_items;
-			g_thread_status[i].count = 0;
-			mem_fence();
 			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
-			g_thread_status[i].count = 0;
-			mem_fence();
 			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count() * 1000 << " ms";
-			g_thread_status[i].count = 0;
-			mem_fence();
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
-			g_thread_status[i].count = 0;
-			mem_fence();
 			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
-			g_thread_status[i].count = 0;
-			mem_fence();
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";

@@ -7,13 +7,6 @@ void Random_Access::Execute_Kernel() {
 
         while (1) {
                 for(uint64_t i = 0; i < m_elements; i++) {
-                        // Here I am assuming the impact of skipping a few pages is not
-                        // going to be a big issue
-                        if (g_measuring) {
-                                mem_fence();
-                                continue;
-                        }
-
                         sum += m_buffer[ m_buffer[i].randoms[0] ].index;
 			sum += m_buffer[ m_buffer[i].randoms[1] ].index;
 			sum += m_buffer[ m_buffer[i].randoms[2] ].index;
