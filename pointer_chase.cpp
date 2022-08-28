@@ -3,7 +3,9 @@
 #include <cstdlib>
 
 void Pointer_Chase::Execute_Kernel() {
-	struct element *tmp = &m_buffer[0];
+	// mark this volatile so that gcc is strict about load and stores
+	// (as if they had side effects) so usage is not optimized away below.
+	volatile struct element *tmp = &m_buffer[0];
 
 	while (1) {
 			//tmp = tmp->next;

@@ -3,7 +3,9 @@
 #include <stdint.h>
 
 void Random_Access::Execute_Kernel() {
-        uint64_t sum = 0;
+        // mark this volatile so that gcc is strict about load and stores
+        // (as if they had side effects) so usage is not optimized away below.
+        volatile uint64_t sum = 0;
 
         while (1) {
                 for(uint64_t i = 0; i < m_elements; i++) {

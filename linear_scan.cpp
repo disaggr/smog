@@ -2,10 +2,12 @@
 #include <stdint.h>
 
 void Linear_Scan::Execute_Kernel() {
-	uint64_t sum = 0;
+	// mark this volatile so that gcc is strict about load and stores
+	// (as if they had side effects) so usage is not optimized away below.
+	volatile uint64_t sum = 0;
+
         uint64_t bytes = m_elements * sizeof(m_elements);
         uint64_t elements = bytes / sizeof(uint64_t);
-
 
         while (1) {
 		//for(uint64_t i = 0; i < elements / 10; i += 10) {
