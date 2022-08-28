@@ -20,10 +20,17 @@ extern pthread_barrier_t g_initalization_finished;
 #  define mem_fence()
 #endif
 
-struct __attribute__((packed)) thread_status_t {
-        size_t count;
-	char padding[CACHE_LINE_SIZE - sizeof(size_t)];
+struct thread_status_t {
+        union {
+                struct {
+                        size_t count;
+                };
+                char padding[CACHE_LINE_SIZE];
+        };
 };
+
+// assert for correct padding
+static_assert (sizeof(thread_status_t) == CACHE_LINE_SIZE, "thread_status_t padded incorrectly");
 
 extern struct thread_status_t *g_thread_status;
 

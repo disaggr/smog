@@ -54,6 +54,7 @@ int main(int argc, char* argv[]) {
 	// determine system characteristics
 	system_pages = sysconf(_SC_PHYS_PAGES);
 	g_page_size = sysconf(_SC_PAGE_SIZE);
+	size_t cache_line_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 	hardware_concurrency = std::thread::hardware_concurrency();
 
 	// per default, spawn one SMOG thread per core
@@ -65,7 +66,15 @@ int main(int argc, char* argv[]) {
 	// per default, keep self-adjusting
 	size_t default_timeout = 0; // s
 
-	std::cout << "System page size: " << g_page_size << " Bytes" << std::endl;
+	std::cout << "System page size:       " << g_page_size << " Bytes" << std::endl;
+	std::cout << "System cache line size: " << cache_line_size << " Bytes" << std::endl;
+
+	// assert for correct cache line size
+	if (cache_line_size != CACHE_LINE_SIZE) {
+		std::cerr << "error: built with incorrect cache line size: " << CACHE_LINE_SIZE << " Bytes. expected: " << cache_line_size << " Bytes" << std::endl;
+		return 2;
+	}
+
 	// parse CLI options
 	popts::options_description description("SMOG Usage");
 	description.add_options()
