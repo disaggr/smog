@@ -31,10 +31,20 @@ class Smog_Kernel {
 			pthread_barrier_wait(&g_initalization_finished);
 			Execute_Kernel();
 		}
+		void Run_Unhinged() {
+			if(m_initialize) {
+				Initialize(m_shuffle);
+			}
+			pthread_barrier_wait(&g_initalization_finished);
+			Execute_Kernel_Unhinged();
+		}
 
 		void Initialize(bool shuffle);
 	protected:
 		virtual void Execute_Kernel() = 0;
+		virtual void Execute_Kernel_Unhinged() {
+			Execute_Kernel();
+		}
 		int m_id;
 		size_t m_page_count;
 		void *m_page_buffer;

@@ -8,4 +8,5 @@ class Linear_Scan : public Smog_Kernel {
 		Linear_Scan(bool initialize) : Smog_Kernel(initialize, false) {}
 	protected:
 		void Execute_Kernel() override;
+		void Execute_Kernel_Unhinged() override;
 };

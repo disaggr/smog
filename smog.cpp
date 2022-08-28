@@ -234,42 +234,25 @@ int main(int argc, char* argv[]) {
 		for(size_t k = 0; k < kernel_groups[i].size(); k++) {
 			g_thread_status[i].count = 0;
 			Smog_Kernel *kernel;
+			bool first = (k == 0);
 			switch(kernel_groups[i][k]) {
 				case 'l':
-					if(k == 0)
-						kernel = new Linear_Scan(true);
-					else
-						kernel = new Linear_Scan(false);
+					kernel = new Linear_Scan(first);
 					break;
 				case 'r':
-					if(k == 0)
-						kernel = new Random_Access(true);
-					else
-						kernel = new Random_Access(false);
+					kernel = new Random_Access(first);
 					break;
 				case 'w':
-					if(k == 0)
-						kernel = new Random_Write(true);
-					else
-						kernel = new Random_Write(false);
+					kernel = new Random_Write(first);
 					break;
 				case 'p':
-					if(k == 0)
-						kernel = new Pointer_Chase(true);
-					else
-						kernel = new Pointer_Chase(false);
+					kernel = new Pointer_Chase(first);
 					break;
 				case 'c':
-					if(k == 0)
-						kernel = new Cold(true);
-					else
-						kernel = new Cold(false);
+					kernel = new Cold(first);
 					break;
 				case 'd':
-					if(k == 0)
-						kernel = new Dirty_Pages(true);
-					else
-						kernel = new Dirty_Pages(false);
+					kernel = new Dirty_Pages(first);
 					break;
 				default:
 					std::cout << "Unknown kernel, must be one of: l, r, w, p, c, d" << std::endl;
@@ -280,7 +263,10 @@ int main(int argc, char* argv[]) {
 
 			topts.push_back(Thread_Options(tid, thread_pages, thread_buffer));
 			kernel->Configure(topts[tid]);
-			t_obj[tid] = std::thread(&Smog_Kernel::Run, kernel);
+			if (g_smog_delay > 0)
+				t_obj[tid] = std::thread(&Smog_Kernel::Run, kernel);
+			else
+				t_obj[tid] = std::thread(&Smog_Kernel::Run_Unhinged, kernel);
 			tid++;
 		}
 	}
