@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(vm.count("kernels")) {
-		int size = 0;
+		size_t size = 0;
 		kernel_groups = vm["kernels"].as<std::vector<std::string>>();
 		for(std::string ks : kernel_groups) {
 			size += ks.size();
@@ -216,14 +216,14 @@ int main(int argc, char* argv[]) {
 	std::vector<std::thread> t_obj(threads);
 	std::vector<Thread_Options> topts;
 
-	int kernel_group_size = kernel_groups.size();
+	size_t kernel_group_size = kernel_groups.size();
 	int tid = 0;
 	for(size_t i = 0; i < kernel_group_size; i++) {
 		size_t pages_begin = std::round(double(smog_pages) / kernel_group_size * i);
 		size_t pages_end = std::round(double(smog_pages) / kernel_group_size * (i + 1)) - 1;
 		size_t thread_pages = pages_end - pages_begin + 1;
 		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * g_page_size);
-		for(int k = 0; k < kernel_groups[i].size(); k++) {
+		for(size_t k = 0; k < kernel_groups[i].size(); k++) {
 			g_thread_status[i].count = 0;
 			Smog_Kernel *kernel;
 			switch(kernel_groups[i][k]) {
