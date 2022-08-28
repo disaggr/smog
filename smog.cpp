@@ -50,6 +50,7 @@ int main(int argc, char* argv[]) {
 	size_t smog_pages = 0;
 	size_t hardware_concurrency = 0;
 	size_t target_rate = 0; // pages/s
+	size_t monitor_interval = 0; // ms
 
 	// determine system characteristics
 	system_pages = sysconf(_SC_PHYS_PAGES);
@@ -63,6 +64,8 @@ int main(int argc, char* argv[]) {
 	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / g_page_size, system_pages / 2);
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
+	// per default, use a monitor interval of 1000ms in the monitor
+	size_t default_interval = 1000; // ms
 	// per default, keep self-adjusting
 	size_t default_timeout = 0; // s
 
@@ -86,6 +89,7 @@ int main(int argc, char* argv[]) {
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
 		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment")
+		("monitor-interval,M", popts::value<size_t>()->default_value(default_interval), "Monitor interval in milliseconds")
 		("file-backing,f", popts::value<std::string>(), "Location of file used for mmap");
 
 	popts::variables_map vm;
@@ -172,6 +176,10 @@ int main(int argc, char* argv[]) {
 
 	if(vm.count("adjust-timeout")) {
 		g_smog_timeout = vm["adjust-timeout"].as<size_t>();
+	}
+
+	if (vm.count("monitor-interval")) {
+		monitor_interval = vm["monitor-interval"].as<size_t>();
 	}
 
 	// allocate global SMOG page buffer
@@ -274,7 +282,6 @@ int main(int argc, char* argv[]) {
 	const int PHASE_STEADY_ADJUST   = 1;
 	const int PHASE_CONSTANT_DELAY  = 2;
 
-	size_t monitor_delay = 1000; // ms
 	size_t monitor_ticks = 0;
 	int phase = PHASE_DYNAMIC_RAMP_UP;
 
@@ -286,7 +293,7 @@ int main(int argc, char* argv[]) {
 
 	while (1) {
 		g_measuring = false;
-		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_delay));
+		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_interval));
 		g_measuring = true;
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - prev);
@@ -302,7 +309,7 @@ int main(int argc, char* argv[]) {
 			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
 			g_thread_status[i].count = 0;
 			mem_fence();
-			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count();
+			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count() * 1000 << " ms";
 			g_thread_status[i].count = 0;
 			mem_fence();
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
