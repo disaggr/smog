@@ -11,15 +11,26 @@
 extern size_t g_page_size;
 extern size_t g_smog_delay;
 extern size_t g_smog_timeout;
-extern bool g_measuring;
 extern pthread_barrier_t g_initalization_finished;
 
-#define mem_fence()  __asm__ __volatile__ ("lwsync" : : : "memory")
+#if defined(__ppc64__) || defined(__PPC64__)
+#  define mem_fence()  __asm__ __volatile__ ("lwsync" : : : "memory")
+#else
+#  define mem_fence()
+#endif
 
-struct __attribute__((packed)) thread_status_t {
-        size_t count;
-	char padding[CACHE_LINE_SIZE - sizeof(size_t)];
+struct thread_status_t {
+        union {
+                struct {
+                        size_t count;
+                        size_t last_count;
+                };
+                char padding[CACHE_LINE_SIZE];
+        };
 };
+
+// assert for correct padding
+static_assert (sizeof(thread_status_t) == CACHE_LINE_SIZE, "thread_status_t padded incorrectly");
 
 extern struct thread_status_t *g_thread_status;
 

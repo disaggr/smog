@@ -4,12 +4,6 @@
 void Dirty_Pages::Execute_Kernel() {
         while (1) {
                 for(size_t i = 0; i < m_page_count * g_page_size; i += g_page_size) {
-                        // Here I am assuming the impact of skipping a few pages is not
-                        // going to be a big issue
-                        if (g_measuring) {
-                                mem_fence();
-                                continue;
-                        }
                         uint64_t tmp = m_buffer[i].index;
                         m_buffer[i].scratch = tmp + 1;
 

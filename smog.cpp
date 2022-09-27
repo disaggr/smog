@@ -30,7 +30,6 @@ namespace popts = boost::program_options;
 size_t g_page_size;
 size_t g_smog_delay;
 size_t g_smog_timeout;
-bool g_measuring = false;
 
 struct thread_status_t *g_thread_status;
 pthread_barrier_t g_initalization_finished;
@@ -50,10 +49,12 @@ int main(int argc, char* argv[]) {
 	size_t smog_pages = 0;
 	size_t hardware_concurrency = 0;
 	size_t target_rate = 0; // pages/s
+	size_t monitor_interval = 0; // ms
 
 	// determine system characteristics
 	system_pages = sysconf(_SC_PHYS_PAGES);
 	g_page_size = sysconf(_SC_PAGE_SIZE);
+	size_t cache_line_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 	hardware_concurrency = std::thread::hardware_concurrency();
 
 	// per default, spawn one SMOG thread per core
@@ -62,10 +63,20 @@ int main(int argc, char* argv[]) {
 	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / g_page_size, system_pages / 2);
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
+	// per default, use a monitor interval of 1000ms in the monitor
+	size_t default_interval = 1000; // ms
 	// per default, keep self-adjusting
 	size_t default_timeout = 0; // s
 
-	std::cout << "System page size: " << g_page_size << " Bytes" << std::endl;
+	std::cout << "System page size:       " << g_page_size << " Bytes" << std::endl;
+	std::cout << "System cache line size: " << cache_line_size << " Bytes" << std::endl;
+
+	// assert for correct cache line size
+	if (cache_line_size != CACHE_LINE_SIZE) {
+		std::cerr << "error: built with incorrect cache line size: " << CACHE_LINE_SIZE << " Bytes. expected: " << cache_line_size << " Bytes" << std::endl;
+		return 2;
+	}
+
 	// parse CLI options
 	popts::options_description description("SMOG Usage");
 	description.add_options()
@@ -77,6 +88,7 @@ int main(int argc, char* argv[]) {
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
 		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment")
+		("monitor-interval,M", popts::value<size_t>()->default_value(default_interval), "Monitor interval in milliseconds")
 		("file-backing,f", popts::value<std::string>(), "Location of file used for mmap");
 
 	popts::variables_map vm;
@@ -95,7 +107,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(vm.count("kernels")) {
-		int size = 0;
+		size_t size = 0;
 		kernel_groups = vm["kernels"].as<std::vector<std::string>>();
 		for(std::string ks : kernel_groups) {
 			size += ks.size();
@@ -165,6 +177,10 @@ int main(int argc, char* argv[]) {
 		g_smog_timeout = vm["adjust-timeout"].as<size_t>();
 	}
 
+	if (vm.count("monitor-interval")) {
+		monitor_interval = vm["monitor-interval"].as<size_t>();
+	}
+
 	// allocate global SMOG page buffer
 	void *buffer;
 	if(vm.count("file-backing")) {
@@ -200,14 +216,14 @@ int main(int argc, char* argv[]) {
 	std::vector<std::thread> t_obj(threads);
 	std::vector<Thread_Options> topts;
 
-	int kernel_group_size = kernel_groups.size();
+	size_t kernel_group_size = kernel_groups.size();
 	int tid = 0;
 	for(size_t i = 0; i < kernel_group_size; i++) {
 		size_t pages_begin = std::round(double(smog_pages) / kernel_group_size * i);
 		size_t pages_end = std::round(double(smog_pages) / kernel_group_size * (i + 1)) - 1;
 		size_t thread_pages = pages_end - pages_begin + 1;
 		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * g_page_size);
-		for(int k = 0; k < kernel_groups[i].size(); k++) {
+		for(size_t k = 0; k < kernel_groups[i].size(); k++) {
 			g_thread_status[i].count = 0;
 			Smog_Kernel *kernel;
 			switch(kernel_groups[i][k]) {
@@ -265,7 +281,6 @@ int main(int argc, char* argv[]) {
 	const int PHASE_STEADY_ADJUST   = 1;
 	const int PHASE_CONSTANT_DELAY  = 2;
 
-	size_t monitor_delay = 1000; // ms
 	size_t monitor_ticks = 0;
 	int phase = PHASE_DYNAMIC_RAMP_UP;
 
@@ -276,9 +291,7 @@ int main(int argc, char* argv[]) {
 	std::chrono::steady_clock::time_point prev = start;
 
 	while (1) {
-		g_measuring = false;
-		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_delay));
-		g_measuring = true;
+		std::this_thread::sleep_for(std::chrono::milliseconds(monitor_interval));
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - prev);
 		prev = now;
@@ -286,22 +299,15 @@ int main(int argc, char* argv[]) {
 		size_t sum = 0;
 
 		for (size_t i = 0; i < threads; ++i) {
-			size_t work_items = g_thread_status[i].count;
+			// NOTE: for very fast kernels, this loses us a couple iterations between this line and the next
+			size_t work_items = g_thread_status[i].count - g_thread_status[i].last_count;
+			g_thread_status[i].last_count = g_thread_status[i].count;
+
 			sum += work_items;
-			g_thread_status[i].count = 0;
-			mem_fence();
 			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
-			g_thread_status[i].count = 0;
-			mem_fence();
-			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count();
-			g_thread_status[i].count = 0;
-			mem_fence();
+			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count() * 1000 << " ms";
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
-			g_thread_status[i].count = 0;
-			mem_fence();
 			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
-			g_thread_status[i].count = 0;
-			mem_fence();
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";
