@@ -300,16 +300,16 @@ int main(int argc, char* argv[]) {
 			sum += work_items;
 			std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
 			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count() * 1000 << " ms";
-			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
+			std::cout << ", " << (work_items * 1.0 / elapsed.count() * CACHE_LINE_SIZE / 1024 / 1024) << " MiB/s";
 			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
 
 			if(csv_file.is_open())
 				csv_file << i << "," << work_items << ","<< elapsed.count() << std::endl;
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
-		std::cout << "total: " << sum << " pages";
-		std::cout << " at " << current_rate << " pages/s";
-		std::cout << ", " << (sum * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
+		std::cout << "total: " << sum << " cache lines";
+		std::cout << " at " << current_rate << " cache lines/s";
+		std::cout << ", " << (sum * 1.0 / elapsed.count() * CACHE_LINE_SIZE / 1024 / 1024) << " MiB/s";
 		if (target_rate) {
 			std::cout << " (" << (100.0 * current_rate / target_rate) << "%)";
 		}

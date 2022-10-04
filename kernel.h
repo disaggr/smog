@@ -4,13 +4,17 @@
 
 #define PARALLEL_ACCESSES 4
 
-struct __attribute__((packed)) element {
-	uint64_t index;
-	struct element *next;
-	struct element *prev;
-	uint64_t randoms[PARALLEL_ACCESSES];
-	uint64_t scratch;
-  	char padding[CACHE_LINE_SIZE - sizeof(uint64_t) - 2 * sizeof(struct node*) - PARALLEL_ACCESSES * sizeof(uint64_t) - sizeof(uint64_t)];
+struct element {
+	union {
+		struct {
+			uint64_t index;
+			struct element *next;
+			struct element *prev;
+			uint64_t randoms[PARALLEL_ACCESSES];
+			uint64_t scratch;
+		};
+		char padding[CACHE_LINE_SIZE];
+	};
 };
 
 class Smog_Kernel {
