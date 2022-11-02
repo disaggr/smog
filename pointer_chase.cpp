@@ -34,7 +34,8 @@ void Pointer_Chase::Execute_Kernel() {
 #define REP9(X) REP8(X) X
 #define REP10(X) REP9(X) X
 
-#define REP(HUNDREDS,TENS,ONES,X) \
+#define REP(THOUSANDS,HUNDREDS,TENS,ONES,X) \
+  REP##THOUSANDS(REP10(REP10(REP10(X)))) \
   REP##HUNDREDS(REP10(REP10(X))) \
   REP##TENS(REP10(X)) \
   REP##ONES(X)
@@ -43,7 +44,7 @@ void Pointer_Chase::Execute_Kernel_Unhinged() {
 	volatile struct element *tmp = &m_buffer[0];
 
 	while (1) {
-		REP(9,9,9,tmp = tmp->next;)
+		REP(0,9,9,9,tmp = tmp->next;)
 		g_thread_status[m_id].count += 999;
 	}
 }

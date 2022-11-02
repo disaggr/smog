@@ -210,7 +210,7 @@ int main(int argc, char* argv[]) {
 		close(fd);
 	}
 	else {
-		buffer = mmap(NULL, smog_pages * g_smog_pagesize, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		buffer = mmap(NULL, smog_pages * g_smog_pagesize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	}
 
 	if(buffer == MAP_FAILED) {
