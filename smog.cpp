@@ -28,7 +28,7 @@ using std::chrono::system_clock;
 namespace popts = boost::program_options;
 
 // globals
-size_t g_page_size;
+size_t g_smog_pagesize;
 size_t g_smog_delay;
 size_t g_smog_timeout;
 
@@ -36,9 +36,9 @@ struct thread_status_t *g_thread_status;
 pthread_barrier_t g_initalization_finished;
 
 long double get_unixtime() {
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        return (long double)tv.tv_sec+(long double)(tv.tv_usec)/1e6;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (long double)tv.tv_sec+(long double)(tv.tv_usec)/1e6;
 }
 
 int main(int argc, char* argv[]) {
@@ -47,6 +47,7 @@ int main(int argc, char* argv[]) {
 	std::vector<char> kernels = {};
 	
 	size_t system_pages = 0;
+	size_t system_pagesize = 0;
 	size_t smog_pages = 0;
 	size_t hardware_concurrency = 0;
 	size_t target_rate = 0; // pages/s
@@ -54,29 +55,20 @@ int main(int argc, char* argv[]) {
 
 	// determine system characteristics
 	system_pages = sysconf(_SC_PHYS_PAGES);
-	g_page_size = sysconf(_SC_PAGE_SIZE);
+	system_pagesize = sysconf(_SC_PAGE_SIZE);
 	size_t cache_line_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 	hardware_concurrency = std::thread::hardware_concurrency();
 
 	// per default, spawn one SMOG thread per core
 	size_t default_threads = hardware_concurrency;
 	// per default, allocate 2 GiB in memory pages for SMOG
-	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / g_page_size, system_pages / 2);
+	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / g_smog_pagesize, (system_pages * system_pagesize) / (g_smog_pagesize * 2));
 	// per default, use a delay of 1000ns in the SMOG threads
 	size_t default_delay = 1000; // ns
 	// per default, use a monitor interval of 1000ms in the monitor
 	size_t default_interval = 1000; // ms
 	// per default, keep self-adjusting
 	size_t default_timeout = 0; // s
-
-	std::cout << "System page size:       " << g_page_size << " Bytes" << std::endl;
-	std::cout << "System cache line size: " << cache_line_size << " Bytes" << std::endl;
-
-	// assert for correct cache line size
-	if (cache_line_size != CACHE_LINE_SIZE) {
-		std::cerr << "error: built with incorrect cache line size: " << CACHE_LINE_SIZE << " Bytes. expected: " << cache_line_size << " Bytes" << std::endl;
-		return 2;
-	}
 
 	// parse CLI options
 	popts::options_description description("SMOG Usage");
@@ -85,6 +77,7 @@ int main(int argc, char* argv[]) {
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
 		("kernels,k", popts::value<std::vector<std::string>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, random (w)rite, (p)ointerchase, (c)old, (d)irty pages")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
+		("page-size,S", popts::value<size_t>()->default_value(system_pagesize), "Page size to use for operations and reporting")
 		("allocation-type,a", popts::value<char>(), "Specify if the allocation happens (g)lobally using mmap or thread-(l)ocal using malloc")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
@@ -103,6 +96,20 @@ int main(int argc, char* argv[]) {
 	}
 
 	std::cout << "SMOG dirty-page benchmark" << std::endl;
+	std::cout << "System page size:       " << system_pagesize << " Bytes" << std::endl;
+
+	if(arguments.count("page-size")) {
+		g_smog_pagesize = arguments["page-size"].as<size_t>();
+		std::cout << "Logical page size:      " << g_smog_pagesize << " Bytes" << std::endl;
+	}
+
+	std::cout << "System cache line size: " << cache_line_size << " Bytes" << std::endl;
+
+	// assert for correct cache line size
+	if (cache_line_size != CACHE_LINE_SIZE) {
+		std::cerr << "error: built with incorrect cache line size: " << CACHE_LINE_SIZE << " Bytes. expected: " << cache_line_size << " Bytes" << std::endl;
+		return 2;
+	}
 
 	if(arguments.count("threads")) {
 		threads = arguments["threads"].as<size_t>();
@@ -172,7 +179,7 @@ int main(int argc, char* argv[]) {
 				std::cerr << "error: " << arguments["rate"].as<std::string>() << ": unrecognized unit specifier: " << target_rate_str.back() << std::endl;
 				return 1;
 			}
-			target_rate = strtoll(target_rate_str.c_str(), NULL, 0) * size_unit / g_page_size;
+			target_rate = strtoll(target_rate_str.c_str(), NULL, 0) * size_unit / g_smog_pagesize;
 			std::cout << "  target dirty rate: " << arguments["rate"].as<std::string>() << " (" << target_rate << " pages/s)" << std::endl;
 		} else {
 			// otherwise, interpret as pages/s
@@ -199,11 +206,11 @@ int main(int argc, char* argv[]) {
 			close(fd);
 			return 1;
 		}
-		buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+		buffer = mmap(NULL, smog_pages * g_smog_pagesize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		close(fd);
 	}
 	else {
-		buffer = mmap(NULL, smog_pages * g_page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		buffer = mmap(NULL, smog_pages * g_smog_pagesize, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	}
 
 	if(buffer == MAP_FAILED) {
@@ -211,8 +218,8 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	else {
-		std::cout << "  pagesize: " << (g_page_size >> 10) << "KiB" << std::endl;
-		std::cout << "Allocated " << smog_pages << " pages (" << (smog_pages * (g_page_size >> 10)) << "KiB)" << std::endl;
+		std::cout << "  pagesize: " << (g_smog_pagesize >> 10) << "KiB" << std::endl;
+		std::cout << "Allocated " << smog_pages << " pages (" << (smog_pages * (g_smog_pagesize >> 10)) << "KiB)" << std::endl;
 	}
 
 	// launch SMOG threads
@@ -230,7 +237,7 @@ int main(int argc, char* argv[]) {
 		size_t pages_begin = std::round(double(smog_pages) / kernel_group_size * i);
 		size_t pages_end = std::round(double(smog_pages) / kernel_group_size * (i + 1)) - 1;
 		size_t thread_pages = pages_end - pages_begin + 1;
-		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * g_page_size);
+		void *thread_buffer = (void*)((uintptr_t)buffer + pages_begin * g_smog_pagesize);
 		for(size_t k = 0; k < kernel_groups[i].size(); k++) {
 			g_thread_status[i].count = 0;
 			Smog_Kernel *kernel;

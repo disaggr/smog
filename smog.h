@@ -7,7 +7,7 @@
 #include <pthread.h>
 
 // globals
-extern size_t g_page_size;
+extern size_t g_smog_pagesize;
 extern size_t g_smog_delay;
 extern size_t g_smog_timeout;
 extern pthread_barrier_t g_initalization_finished;

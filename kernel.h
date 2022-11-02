@@ -25,7 +25,7 @@ class Smog_Kernel {
 			m_page_count = t_opts.page_count;
 			m_page_buffer = t_opts.page_buffer;
 			m_buffer = (struct element*) m_page_buffer;
-			m_elements = m_page_count * g_page_size / sizeof(struct element);
+			m_elements = m_page_count * g_smog_pagesize / sizeof(struct element);
 			
 		}
 		void Run() {
