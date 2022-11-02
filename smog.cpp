@@ -1,5 +1,6 @@
 #include <thread>
 #include <iostream>
+#include <fstream>
 #include <sys/mman.h>
 #include <cerrno>
 #include <unistd.h>
@@ -89,26 +90,27 @@ int main(int argc, char* argv[]) {
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
 		("adjust-timeout,R", popts::value<size_t>()->default_value(default_timeout), "Timeout in seconds for automatic adjustment")
 		("monitor-interval,M", popts::value<size_t>()->default_value(default_interval), "Monitor interval in milliseconds")
-		("file-backing,f", popts::value<std::string>(), "Location of file used for mmap");
+		("file-backing,f", popts::value<std::string>(), "Location of file used for mmap")
+		("csv,c", popts::value<std::string>(), "Output measurements in csv format to");
 
-	popts::variables_map vm;
-	popts::store(popts::command_line_parser(argc, argv).options(description).run(), vm);
-	popts::notify(vm);
+	popts::variables_map arguments;
+	popts::store(popts::command_line_parser(argc, argv).options(description).run(), arguments);
+	popts::notify(arguments);
 
-	if(vm.count("help")) {
+	if(arguments.count("help")) {
 		std::cout << description << std::endl;
 		return 0;
 	}
 
 	std::cout << "SMOG dirty-page benchmark" << std::endl;
 
-	if(vm.count("threads")) {
-		threads = vm["threads"].as<size_t>();
+	if(arguments.count("threads")) {
+		threads = arguments["threads"].as<size_t>();
 	}
 
-	if(vm.count("kernels")) {
+	if(arguments.count("kernels")) {
 		size_t size = 0;
-		kernel_groups = vm["kernels"].as<std::vector<std::string>>();
+		kernel_groups = arguments["kernels"].as<std::vector<std::string>>();
 		for(std::string ks : kernel_groups) {
 			size += ks.size();
 			for(uint64_t i = 0; i < ks.size(); i++) {
@@ -125,16 +127,22 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	if(vm.count("pages")) {
-		smog_pages = vm["pages"].as<size_t>();
+	if(arguments.count("pages")) {
+		smog_pages = arguments["pages"].as<size_t>();
 	}
 
-	if(vm.count("delay")) {
-		g_smog_delay = vm["delay"].as<size_t>();
+	if(arguments.count("delay")) {
+		g_smog_delay = arguments["delay"].as<size_t>();
 	}
 
-	if(vm.count("rate")) {
-		std::string target_rate_str = vm["rate"].as<std::string>();
+	std::ofstream csv_file;
+	if (arguments.count("csv")){
+		csv_file.open(arguments["csv"].as<std::string>());
+		csv_file << "thread,pages,elapsed" << std::endl;
+	}
+
+	if(arguments.count("rate")) {
+		std::string target_rate_str = arguments["rate"].as<std::string>();
 
 		if (target_rate_str.back() == 'B') {
 			// determine possible size suffix
@@ -161,11 +169,11 @@ int main(int argc, char* argv[]) {
 				size_unit = multiplier * multiplier * multiplier * multiplier;
 				break;
 			default:
-				std::cerr << "error: " << vm["rate"].as<std::string>() << ": unrecognized unit specifier: " << target_rate_str.back() << std::endl;
+				std::cerr << "error: " << arguments["rate"].as<std::string>() << ": unrecognized unit specifier: " << target_rate_str.back() << std::endl;
 				return 1;
 			}
 			target_rate = strtoll(target_rate_str.c_str(), NULL, 0) * size_unit / g_page_size;
-			std::cout << "  target dirty rate: " << vm["rate"].as<std::string>() << " (" << target_rate << " pages/s)" << std::endl;
+			std::cout << "  target dirty rate: " << arguments["rate"].as<std::string>() << " (" << target_rate << " pages/s)" << std::endl;
 		} else {
 			// otherwise, interpret as pages/s
 			target_rate = strtoll(target_rate_str.c_str(), NULL, 0);
@@ -173,18 +181,18 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	if(vm.count("adjust-timeout")) {
-		g_smog_timeout = vm["adjust-timeout"].as<size_t>();
+	if(arguments.count("adjust-timeout")) {
+		g_smog_timeout = arguments["adjust-timeout"].as<size_t>();
 	}
 
-	if (vm.count("monitor-interval")) {
-		monitor_interval = vm["monitor-interval"].as<size_t>();
+	if (arguments.count("monitor-interval")) {
+		monitor_interval = arguments["monitor-interval"].as<size_t>();
 	}
 
 	// allocate global SMOG page buffer
 	void *buffer;
-	if(vm.count("file-backing")) {
-		std::string file_backing = std::string(vm["file-backing"].as<std::string>());
+	if(arguments.count("file-backing")) {
+		std::string file_backing = std::string(arguments["file-backing"].as<std::string>());
 		int fd;
 		if ((fd = open(file_backing.c_str(), O_RDWR|O_SYNC)) < 0 ) {
 			std::cout << "open failed: " << std::strerror(errno) << std::endl;
@@ -308,6 +316,9 @@ int main(int argc, char* argv[]) {
 			std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count() * 1000 << " ms";
 			std::cout << ", " << (work_items * 1.0 / elapsed.count() * g_page_size / 1024 / 1024) << " MiB/s";
 			std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
+
+			if(csv_file.is_open())
+				csv_file << i << "," << work_items << ","<< elapsed.count() << std::endl;
 		}
 		double current_rate = sum * 1.0 / elapsed.count();
 		std::cout << "total: " << sum << " pages";
@@ -390,6 +401,7 @@ int main(int argc, char* argv[]) {
 	for(size_t i = 0; i < threads; i++) {
 		t_obj[i].join();
 	}
-
+	if(csv_file.is_open())
+		csv_file.close();
 	return 0;
 }

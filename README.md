@@ -21,9 +21,9 @@ The output should look something like this:
     -h [ --help ]                    Display this help message
     -t [ --threads ] arg (=8)        Number of threads to spawn
     -p [ --pages ] arg (=524288)     Number of pages to allocate
-    -d [ --delay ] arg (=1000)       Delay in nanoseconds per thread per 
+    -d [ --delay ] arg (=1000)       Delay in nanoseconds per thread per
                                     iteration
-    -r [ --rate ] arg                Target dirty rate to automatically adjust 
+    -r [ --rate ] arg                Target dirty rate to automatically adjust
                                     delay
     -R [ --adjust-timeout ] arg (=0) Timeout in seconds for automatic adjustment
 
