@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
 		("threads,t", popts::value<size_t>()->default_value(default_threads), "Number of threads to spawn")
 		("kernels,k", popts::value<std::vector<std::string>>()->multitoken(), "For each thread you can specifiy a kernel to execute: (l)inear, (r)andom, random (w)rite, (p)ointerchase, (c)old, (d)irty pages")
 		("pages,p", popts::value<size_t>()->default_value(default_pages), "Number of pages to allocate")
-		("page-size,S", popts::value<size_t>()->default_value(system_pagesize), "Page size to use for operations and reporting")
+		("page-size,S", popts::value<size_t>(), "Page size to use for operations and reporting")
 		("allocation-type,a", popts::value<char>(), "Specify if the allocation happens (g)lobally using mmap or thread-(l)ocal using malloc")
 		("delay,d", popts::value<size_t>()->default_value(default_delay), "Delay in nanoseconds per thread per iteration")
 		("rate,r", popts::value<std::string>(), "Target dirty rate to automatically adjust delay")
@@ -96,11 +96,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	std::cout << "SMOG dirty-page benchmark" << std::endl;
-	std::cout << "System page size:       " << system_pagesize << " Bytes" << std::endl;
+	std::cout << "System page size:       " << (system_pagesize << 10) << " KiB" << std::endl;
 
+  g_smog_pagesize = system_pagesize;
 	if(arguments.count("page-size")) {
 		g_smog_pagesize = arguments["page-size"].as<size_t>();
-		std::cout << "Logical page size:      " << g_smog_pagesize << " Bytes" << std::endl;
+		std::cout << "Logical page size:      " << (g_smog_pagesize << 10) << " KiB" << std::endl;
 	}
 
 	std::cout << "System cache line size: " << cache_line_size << " Bytes" << std::endl;
@@ -218,7 +219,6 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	else {
-		std::cout << "  pagesize: " << (g_smog_pagesize >> 10) << "KiB" << std::endl;
 		std::cout << "Allocated " << smog_pages << " pages (" << (smog_pages * (g_smog_pagesize >> 10)) << "KiB)" << std::endl;
 	}
 
