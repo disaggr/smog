@@ -3,7 +3,7 @@
 
 void Dirty_Pages::Execute_Kernel() {
         while (1) {
-                for(size_t i = 0; i < m_page_count * g_smog_pagesize; i += g_smog_pagesize) {
+                for(size_t i = 0; i < m_page_count * g_smog_pagesize / sizeof(struct element); i += g_smog_pagesize / sizeof(struct element)) {
                         uint64_t tmp = m_buffer[i].index;
                         m_buffer[i].scratch = tmp + 1;
 
