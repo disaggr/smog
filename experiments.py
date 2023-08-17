@@ -1,7 +1,7 @@
 """Run a set of experiments with different kernels and delays."""
 from pathlib import Path
 import subprocess
-from enum import Enum
+from enum import Enum, IntEnum
 
 
 class KernelType(Enum):
@@ -14,6 +14,12 @@ class KernelType(Enum):
     COLD = "c"
     DIRTY = "d"
 
+class Delay(IntEnum):
+    """Defines the configrued SMOG delays."""
+
+    NONE = 0
+    LONG = 1000
+    SHORT = 100
 
 def smog(kernels: list[KernelType], delay: int, csv_file: Path):
     """Run the smog program with the given configuration."""
@@ -30,6 +36,7 @@ def smog(kernels: list[KernelType], delay: int, csv_file: Path):
         "-c",
         str(csv_file),
     ]
+    print(f'+{" ".join(args)}')
     try:
         subprocess.call(args, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -40,8 +47,12 @@ def main():
     """Run a set of experiments."""
     data_base = Path("data")
     data_base.mkdir(exist_ok=True, parents=True)
+    i = 0
+    t = len(KernelType) * len(Delay)
     for kernel in KernelType:
-        for delay in range(0, 1000, 100):
+        for delay in map(int, Delay):
+            i = i + 1
+            print(f'[{i}/{t}]', end='')
             kernels = [kernel] * 4
             csv_path = data_base / f"{kernel.name.lower()}_{delay}.csv"
             smog(kernels, delay, csv_path)

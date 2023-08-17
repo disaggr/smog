@@ -1,3 +1,5 @@
 smog
 smog-O*
 *.o
+
+data/
