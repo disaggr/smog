@@ -61,6 +61,17 @@ int main(int argc, char* argv[]) {
 
 	// per default, spawn one SMOG thread per core
 	size_t default_threads = hardware_concurrency;
+	// and one dirty page kernel per thread in a shared group
+	kernel_groups.push_back(std::string(default_threads, 'd'));
+	for(std::string ks : kernel_groups) {
+		for(uint64_t i = 0; i < ks.size(); i++) {
+			if(i > 0 && ks[i] == 'p') {
+				std::cout << "If the pointerchase kernel is used, put it at the beginning because. Just this kernel is initialized and pointer chase needs shuffling." << std::endl;
+				return 1;
+			}
+			kernels.push_back(ks[i]);
+		}
+	}
 	// per default, allocate 2 GiB in memory pages for SMOG
 	size_t default_pages = std::min( (2UL * 1024 * 1024 * 1024) / system_pagesize, system_pages / 2);
 	// per default, use a delay of 1000ns in the SMOG threads
@@ -98,7 +109,7 @@ int main(int argc, char* argv[]) {
 	std::cout << "SMOG dirty-page benchmark" << std::endl;
 	std::cout << "System page size:       " << (system_pagesize << 10) << " KiB" << std::endl;
 
-  g_smog_pagesize = system_pagesize;
+	g_smog_pagesize = system_pagesize;
 	if(arguments.count("page-size")) {
 		g_smog_pagesize = arguments["page-size"].as<size_t>();
 		std::cout << "Logical page size:      " << (g_smog_pagesize << 10) << " KiB" << std::endl;
@@ -114,10 +125,25 @@ int main(int argc, char* argv[]) {
 
 	if(arguments.count("threads")) {
 		threads = arguments["threads"].as<size_t>();
+
+		kernel_groups.clear();
+		kernel_groups.push_back(std::string(threads, 'd'));
+
+		kernels.clear();
+		for(std::string ks : kernel_groups) {
+			for(uint64_t i = 0; i < ks.size(); i++) {
+				if(i > 0 && ks[i] == 'p') {
+					std::cout << "If the pointerchase kernel is used, put it at the beginning because. Just this kernel is initialized and pointer chase needs shuffling." << std::endl;
+					return 1;
+				}
+				kernels.push_back(ks[i]);
+			}
+		}
 	}
 
 	if(arguments.count("kernels")) {
 		size_t size = 0;
+		kernel_groups.clear();
 		kernel_groups = arguments["kernels"].as<std::vector<std::string>>();
 		for(std::string ks : kernel_groups) {
 			size += ks.size();
