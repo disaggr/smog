@@ -288,6 +288,8 @@ int main(int argc, char* argv[]) {
 	// sync with worker threads
 	pthread_barrier_wait(&g_initalization_finished);
 
+	std::cout << "initialization finished, starting monitor" << std::endl;
+
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	std::chrono::steady_clock::time_point prev = start;
 
