@@ -107,12 +107,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	std::cout << "SMOG dirty-page benchmark" << std::endl;
-	std::cout << "System page size:       " << (system_pagesize << 10) << " KiB" << std::endl;
+	std::cout << "System page size:       " << (system_pagesize >> 10) << " KiB" << std::endl;
 
 	g_smog_pagesize = system_pagesize;
 	if(arguments.count("page-size")) {
 		g_smog_pagesize = arguments["page-size"].as<size_t>();
-		std::cout << "Logical page size:      " << (g_smog_pagesize << 10) << " KiB" << std::endl;
+		std::cout << "Logical page size:      " << (g_smog_pagesize >> 10) << " KiB" << std::endl;
 	}
 
 	std::cout << "System cache line size: " << cache_line_size << " Bytes" << std::endl;
