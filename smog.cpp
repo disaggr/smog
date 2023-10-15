@@ -211,6 +211,9 @@ int main(int argc, char* argv[]) {
 		} else {
 			// otherwise, interpret as pages/s
 			target_rate = strtoll(target_rate_str.c_str(), NULL, 0);
+			if (g_smog_pagesize != system_pagesize) {
+				target_rate *= (system_pagesize / g_smog_pagesize);
+			}
 			std::cout << "  target dirty rate: " << target_rate << " pages/s" << std::endl;
 		}
 	}
