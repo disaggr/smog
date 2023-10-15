@@ -190,6 +190,8 @@ int main(int argc, char* argv[]) {
 			// determine magnitude
 			size_t size_unit = 1;
 			switch (target_rate_str.back()) {
+      case '0' ... '9':
+        break;
 			case 'K':
 				size_unit = multiplier;
 				break;
