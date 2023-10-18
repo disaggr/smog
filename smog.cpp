@@ -145,6 +145,8 @@ int main(int argc, char* argv[]) {
 		size_t size = 0;
 		kernel_groups.clear();
 		kernel_groups = arguments["kernels"].as<std::vector<std::string>>();
+
+    kernels.clear();
 		for(std::string ks : kernel_groups) {
 			size += ks.size();
 			for(uint64_t i = 0; i < ks.size(); i++) {
