@@ -1,10 +1,11 @@
+/*
+ * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
+ */
+
 #pragma once
 
-#include <cstddef>
-#include <time.h>
-#include <sys/time.h>
-#include <ctime>
 #include <pthread.h>
+#include <argp.h>
 
 // globals
 extern size_t g_smog_pagesize;
@@ -24,28 +25,38 @@ extern pthread_barrier_t g_initalization_finished;
 #endif
 
 struct thread_status_t {
-        union {
-                struct {
-                        size_t count;
-                        size_t last_count;
-                };
-                char padding[CACHE_LINE_SIZE];
+    union {
+        struct {
+            size_t count;
+            size_t last_count;
         };
+        char padding[CACHE_LINE_SIZE];
+    };
 };
 
-// assert for correct padding
-static_assert (sizeof(thread_status_t) == CACHE_LINE_SIZE, "thread_status_t padded incorrectly");
-
+extern size_t g_thread_count;
 extern struct thread_status_t *g_thread_status;
+extern struct thread_options *g_thread_options;
+extern pthread_t *g_threads;
 
-class Thread_Options {
-    public:
-        Thread_Options(int tid, size_t page_count, void *page_buffer) :
-            tid(tid), page_count(page_count), page_buffer(page_buffer)
-        {}
-        int tid;
-        size_t page_count;
-        void *page_buffer;
+struct thread_options {
+    int tid;
+    void *slice_start;
+    size_t slice_length;
 };
 
-long double get_unixtime();
+enum output_format {
+    PLAIN,
+    CSV,
+};
+
+struct arguments {
+    size_t pagesize;
+    size_t monitor_interval;
+    enum output_format output_format;
+    const char *output_file;
+    const char *smogfile;
+    int verbose;
+};
+
+extern struct arguments arguments;

@@ -1,8 +1,25 @@
 CXX=g++
-CXXFLAGS=-I. -lboost_program_options -lstdc++ -lpthread -Wall -Wextra -g
+CFLAGS=-I. -lboost_program_options -lyaml -lstdc++ -lpthread -Wall -Wextra -g 
+CXXFLAGS=$(CFLAGS)
 
-smog: smog.o kernel.o linear_scan.o random_access.o random_write.o pointer_chase.o cold.o dirty_pages.o
-	$(CXX) -o smog smog.o kernel.o linear_scan.o random_access.o random_write.o pointer_chase.o cold.o dirty_pages.o $(CXXFLAGS)
+BIN = smog
+
+OBJ = smog.o \
+      util.o \
+      args.o \
+      parser.o \
+      kernel.o \
+      monitor.o \
+      kernels/kernels.o \
+      kernels/linear_scan.o \
+      kernels/random_access.o \
+      kernels/random_write.o \
+      kernels/pointer_chase.o \
+      kernels/cold.o \
+      kernels/dirty_pages.o
+
+$(BIN): $(OBJ)
+	$(CXX) -o $@ $(OBJ) $(CXXFLAGS)
 
 opt:
 	$(MAKE) clean
@@ -18,7 +35,7 @@ opt:
 	$(MAKE)
 
 clean:
-	$(RM) *.o
+	$(RM) $(OBJ)
 
 veryclean:
-	$(RM) *.o smog smog-O*
+	$(RM) $(OBJ) smog smog-O*

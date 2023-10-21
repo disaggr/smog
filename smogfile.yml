@@ -1,0 +1,20 @@
+---
+# describe one or more buffers to be allocated by smog
+buffers:
+  - size: 1MiB
+    file: /tmp/foo
+
+    # describe one or more slices over these buffers
+    slices:
+      - range: 0...<50%
+      - range: 50%...<100%
+        group: 8
+
+# describe one or more threads and their associated kernels
+threads:
+  - kernel: random read
+    buffer: 0:0
+    group: 8
+  - kernel: dirty pages
+    buffer: 0:1
+    group: 8
