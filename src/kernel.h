@@ -30,11 +30,18 @@ class Smog_Kernel {
       m_id = t_opts.tid;
       m_slice_start = t_opts.slice_start;
       m_slice_length = t_opts.slice_length;
+      m_delay = t_opts.delay;
       m_buffer = (struct element*) m_slice_start;
       m_elements = m_slice_length / sizeof(struct element);
   }
   static void* Run(void *kernel) {
-      ((Smog_Kernel*)kernel)->Run();
+      Smog_Kernel *k = (Smog_Kernel*)kernel;
+
+      if (k->m_delay > 0)
+          k->Run();
+      else
+          k->Run_Unhinged();
+
       return NULL;
   }
   void Run() {
@@ -43,10 +50,6 @@ class Smog_Kernel {
       }
       pthread_barrier_wait(&g_initalization_finished);
       Execute_Kernel();
-  }
-  static void* Run_Unhinged(void *kernel) {
-      ((Smog_Kernel*)kernel)->Run_Unhinged();
-      return NULL;
   }
   void Run_Unhinged() {
       if (m_initialize) {
@@ -66,6 +69,7 @@ class Smog_Kernel {
   int m_id;
   void *m_slice_start;
   size_t m_slice_length;
+  size_t m_delay;
   struct element *m_buffer;
   uint64_t m_elements;
   bool m_initialize;

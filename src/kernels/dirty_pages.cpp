@@ -8,7 +8,7 @@
 
 void Dirty_Pages::Execute_Kernel() {
     size_t limit = m_slice_length / sizeof(struct element);
-    size_t step = g_smog_pagesize / sizeof(struct element);
+    size_t step = arguments.pagesize / sizeof(struct element);
 
     while (1) {
         for (size_t i = 0; i < limit; i += step) {
@@ -18,7 +18,7 @@ void Dirty_Pages::Execute_Kernel() {
             g_thread_status[m_id].count += 1;
 
             volatile uint64_t delay = 0;
-            for (size_t j = 0; j < g_smog_delay; j++) {
+            for (size_t j = 0; j < m_delay; j++) {
                 delay += 1;
             }
         }

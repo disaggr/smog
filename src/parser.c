@@ -24,6 +24,7 @@ enum key {
     KEY_GROUP,
     KEY_KERNEL,
     KEY_BUFFER,
+    KEY_DELAY,
 };
 
 enum context {
@@ -120,6 +121,7 @@ struct parsed_thread {
     enum kernel kernel;
     size_t buffer_id;
     size_t slice_id;
+    size_t delay;
     size_t group;
 };
 
@@ -305,6 +307,9 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             } else if (!strcmp(value, "buffer")) {
                                 state->key = KEY_BUFFER;
                                 state->state = STATE_EXPECT_SCALAR;
+                            } else if (!strcmp(value, "delay")) {
+                                state->key = KEY_DELAY;
+                                state->state = STATE_EXPECT_SCALAR;
                             } else if (!strcmp(value, "group")) {
                                 state->key = KEY_GROUP;
                                 state->state = STATE_EXPECT_SCALAR;
@@ -391,6 +396,7 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             t->kernel = state->thread.kernel;
                             t->buffer_id = state->thread.buffer_id;
                             t->slice_id = state->thread.slice_id;
+                            t->delay = state->thread.delay;
                             t->group = state->thread.group;
                             state->state = STATE_LIST;
                             break;
@@ -648,6 +654,28 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             }
                             break;
 
+                        case KEY_DELAY:
+                            // the delay is a single integer
+                            errno = 0;
+                            size_t delay = strtoll(value, NULL, 0);
+                            if (errno != 0) {
+                                parser_error(parser, event, "invalid delay: %s", value);
+                                return 0;
+                            }
+
+                            switch (state->context) {
+                                case CONTEXT_THREAD:
+                                    state->thread.delay = delay;
+                                    break;
+                                default:
+                                    parser_error(parser, event, "%s does not apply to %s",
+                                                 key_str(state->key),
+                                                 context_str(state->context));
+                                    return 0;
+                            }
+                            break;
+
+
                         default:
                             parser_error(parser, event, "Unrecognized key: %d", state->key);
                             return 0;
@@ -761,6 +789,7 @@ int yaml_parse(const char *file, struct yaml_config *config) {
         printf("      kernel: %s\n", kernel_to_string(t->kernel));
         printf("      buffer: %zu:%zu\n", t->buffer_id, t->slice_id);
         printf("     *slice : %p\n", t->slice);
+        printf("      delay : %zu\n", t->delay);
         printf("      group : %zu\n", t->group);
     }
 

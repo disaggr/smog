@@ -34,7 +34,7 @@ void Linear_Scan::Execute_Kernel() {
             // g_thread_status[m_id].count += 1;
 
             volatile uint64_t delay = 0;
-            for (size_t j = 0; j < g_smog_delay; j++) {
+            for (size_t j = 0; j < m_delay; j++) {
                 delay += 1;
             }
         }

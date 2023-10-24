@@ -24,8 +24,6 @@
 #include "kernels/dirty_pages.h"
 
 // globals
-size_t g_smog_pagesize;
-size_t g_smog_delay;
 size_t g_smog_timeout;
 
 // threads
@@ -184,10 +182,12 @@ int main(int argc, char* argv[]) {
                    format_size_string(slice_size), off_start, off_end,
                    config.threads[i].buffer_id);
             printf("    At %p ... %p\n", start, end);
+            printf("    With delay %zu\n", config.threads[i].delay);
 
             options->tid = tid;
             options->slice_start = start;
             options->slice_length = slice_size;
+            options->delay = config.threads[i].delay;
 
             Smog_Kernel *kernel;
             bool first = (tid == 0);
@@ -217,10 +217,7 @@ int main(int argc, char* argv[]) {
 
             kernel->Configure(*options);
 
-            if (g_smog_delay > 0)
-                pthread_create(thread, NULL, (void*(*)(void*))&Smog_Kernel::Run, kernel);
-            else
-                pthread_create(thread, NULL, (void*(*)(void*))&Smog_Kernel::Run_Unhinged, kernel);
+            pthread_create(thread, NULL, (void*(*)(void*))&Smog_Kernel::Run, kernel);
         }
     }
 

@@ -8,9 +8,8 @@
 #include <argp.h>
 
 // globals
-extern size_t g_smog_pagesize;
-extern size_t g_smog_delay;
 extern size_t g_smog_timeout;
+
 extern pthread_barrier_t g_initalization_finished;
 
 #if defined(__ppc64__) || defined(__PPC64__) || defined(__powerpc64__)
@@ -43,6 +42,7 @@ struct thread_options {
     int tid;
     void *slice_start;
     size_t slice_length;
+    size_t delay;
 };
 
 enum output_format {

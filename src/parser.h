@@ -36,6 +36,7 @@ struct yaml_thread {
     enum kernel kernel;
     size_t buffer_id;
     size_t slice_id;
+    size_t delay;
     size_t group;
     struct yaml_slice *slice;
 };
