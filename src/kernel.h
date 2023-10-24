@@ -33,12 +33,20 @@ class Smog_Kernel {
       m_buffer = (struct element*) m_slice_start;
       m_elements = m_slice_length / sizeof(struct element);
   }
+  static void* Run(void *kernel) {
+      ((Smog_Kernel*)kernel)->Run();
+      return NULL;
+  }
   void Run() {
       if (m_initialize) {
           Initialize(m_shuffle);
       }
       pthread_barrier_wait(&g_initalization_finished);
       Execute_Kernel();
+  }
+  static void* Run_Unhinged(void *kernel) {
+      ((Smog_Kernel*)kernel)->Run_Unhinged();
+      return NULL;
   }
   void Run_Unhinged() {
       if (m_initialize) {

@@ -10,11 +10,11 @@
 #include <iostream>
 #include <fstream>
 
-#include "smog.h"
+#include "./smog.h"
 
 int monitor_run() {
     std::ofstream csv_file;
-    if (arguments.output_format == CSV){
+    if (arguments.output_format == CSV) {
         csv_file.open(arguments.output_file);
         csv_file << "thread,pages,elapsed" << std::endl;
     }
@@ -23,7 +23,7 @@ int monitor_run() {
     const int PHASE_STEADY_ADJUST   = 1;
     const int PHASE_CONSTANT_DELAY  = 2;
 
-    size_t monitor_interval = arguments.monitor_interval; // ms
+    size_t monitor_interval = arguments.monitor_interval;  // ms
 
     size_t monitor_ticks = 0;
     int phase = PHASE_DYNAMIC_RAMP_UP;
@@ -51,7 +51,7 @@ int monitor_run() {
             std::cout << ", " << (work_items * 1.0 / elapsed.count() * CACHE_LINE_SIZE / 1024 / 1024) << " MiB/s";
             std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
 
-            if(csv_file.is_open())
+            if (csv_file.is_open())
               csv_file << i << "," << work_items << ","<< elapsed.count() << std::endl;
         }
         double current_rate = sum * 1.0 / elapsed.count();
@@ -136,9 +136,9 @@ int monitor_run() {
         monitor_ticks++;
     }
 
-    for(size_t i = 0; i < g_thread_count; i++) {
+    for (size_t i = 0; i < g_thread_count; i++) {
         pthread_join(g_threads[i], NULL);
     }
-    if(csv_file.is_open())
+    if (csv_file.is_open())
       csv_file.close();
 }

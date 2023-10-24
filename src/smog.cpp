@@ -8,11 +8,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include <thread>
-#include <iostream>
 #include <cerrno>
 #include <vector>
 #include <cstring>
+#include <cstdlib>
 
 #include "./util.h"
 #include "./parser.h"
@@ -23,13 +22,6 @@
 #include "kernels/pointer_chase.h"
 #include "kernels/cold.h"
 #include "kernels/dirty_pages.h"
-
-// assert for correct padding
-static_assert (sizeof(thread_status_t) == CACHE_LINE_SIZE, "thread_status_t padded incorrectly");
-
-using std::chrono::duration_cast;
-using std::chrono::milliseconds;
-using std::chrono::system_clock;
 
 // globals
 size_t g_smog_pagesize;
@@ -54,7 +46,7 @@ int main(int argc, char* argv[]) {
     size_t system_pages = sysconf(_SC_PHYS_PAGES);
     size_t system_pagesize = sysconf(_SC_PAGE_SIZE);
     size_t cache_line_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
-    size_t hardware_concurrency = std::thread::hardware_concurrency();
+    size_t hardware_concurrency = sysconf(_SC_NPROCESSORS_ONLN);
 
     arguments.pagesize = system_pagesize;
 
@@ -77,6 +69,12 @@ int main(int argc, char* argv[]) {
                 CACHE_LINE_SIZE, cache_line_size);
         return 2;
     }
+    // assert for correct padding
+    if (sizeof(thread_status_t) != CACHE_LINE_SIZE) {
+        fprintf(stderr, "error: mismatched thread_status_t: %#zx Bytes. expected: %#x Bytes\n",
+                sizeof(thread_status_t), CACHE_LINE_SIZE);
+        return 2;
+    }
 
     // parse smogfile
     struct yaml_config config = { NULL, 0, NULL, 0 };
@@ -87,10 +85,10 @@ int main(int argc, char* argv[]) {
     }
 
     // initialize buffers
-    std::cout << std::endl;
-    std::cout << "Creating " << config.nbuffers << " SMOG buffers" << std::endl;
+    printf("\n");
+    printf("Creating %zu SMOG buffers\n", config.nbuffers);
 
-    void **buffers = (void**)malloc(sizeof(*buffers) * config.nbuffers);
+    char **buffers = (char**)malloc(sizeof(*buffers) * config.nbuffers);
     if (!buffers) {
         perror("malloc");
         return -1;
@@ -100,34 +98,35 @@ int main(int argc, char* argv[]) {
         if (config.buffers[i].file) {
             int fd = open(config.buffers[i].file, O_RDWR | O_SYNC);
             if (fd < 0) {
-                std::cout << config.buffers[i].file << ": open failed: "
-                          << std::strerror(errno) << std::endl;
+                fprintf(stderr, "%s: open failed: %s\n", config.buffers[i].file,
+                        strerror(errno));
                 return 1;
             }
-            buffers[i] = mmap(NULL, config.buffers[i].size,
-                              PROT_READ | PROT_WRITE,
-                              MAP_SHARED,
-                              fd, 0);
+            buffers[i] = (char*)mmap(NULL, config.buffers[i].size,
+                                     PROT_READ | PROT_WRITE,
+                                     MAP_SHARED,
+                                     fd, 0);
             close(fd);
         } else {
-            buffers[i] = mmap(NULL, config.buffers[i].size,
-                              PROT_READ | PROT_WRITE,
-                              MAP_PRIVATE | MAP_ANONYMOUS,
-                              -1, 0);
+            buffers[i] = (char*)mmap(NULL, config.buffers[i].size,
+                                     PROT_READ | PROT_WRITE,
+                                     MAP_PRIVATE | MAP_ANONYMOUS,
+                                     -1, 0);
         }
         if (buffers[i] == MAP_FAILED) {
-            std::cout << "mmap failed: " << std::strerror(errno) << std::endl;
+            fprintf(stderr, "mmap failed: %s\n", strerror(errno));
             return 1;
         }
-        std::cout << "  Allocated buffer #" << i 
-                  << " with " << format_size_string(config.buffers[i].size);
+
+        printf("  Allocated buffer #%zu with %s", i,
+               format_size_string(config.buffers[i].size));
         if (config.buffers[i].file) {
-            std::cout << " from " << config.buffers[i].file << std::endl;
+            printf(" from %s\n", config.buffers[i].file);
         } else {
-            std::cout << " from anonymous region" << std::endl;
+            printf(" from anonymous region\n");
         }
-        std::cout << "    At " << buffers[i] << " ... "
-                  << buffers[i] + config.buffers[i].size - 1 << std::endl;
+        printf("    At %p ... %p\n", buffers[i],
+               buffers[i] + config.buffers[i].size - 1);
     }
 
     // initialize threads
@@ -136,9 +135,8 @@ int main(int argc, char* argv[]) {
         g_thread_count += config.threads[i].group ? config.threads[i].group : 1;
     }
 
-    // launch SMOG threads
-    std::cout << std::endl;
-    std::cout << "Creating " << g_thread_count << " SMOG threads" << std::endl;
+    printf("\n");
+    printf("Creating %zu SMOG threads\n", g_thread_count);
 
     g_thread_status = (thread_status_t*)malloc(sizeof(*g_thread_status) * g_thread_count);
     g_thread_options = (thread_options*)malloc(sizeof(*g_thread_options) * g_thread_count);
@@ -170,23 +168,22 @@ int main(int argc, char* argv[]) {
             if (s->group) {
                 size_t group_num = j % s->group;
                 size_t len = off_end - off_start + 1;
-                off_t new_start = off_start + len * group_num / s->group; 
+                off_t new_start = off_start + len * group_num / s->group;
                 off_t new_end = off_start + len * (group_num + 1) / s->group;
                 off_start = new_start;
                 off_end = new_end - 1;
             }
 
             void *start = buffers[config.threads[i].buffer_id] + off_start;
-            void *end = buffers[config.threads[i].buffer_id] + off_end; 
+            void *end = buffers[config.threads[i].buffer_id] + off_end;
 
             size_t slice_size = off_end - off_start + 1;
 
-            std::cout << "  Creating SMOG kernel '" << kernel
-                      << "' on thread #" << tid << std::endl;
-            std::cout << "    With " << format_size_string(slice_size)
-                      << " ranged " << off_start << " ... " << off_end
-                      << " on buffer #" << config.threads[i].buffer_id << std::endl
-                      << "    At " << start << " ... " << end << std::endl; 
+            printf("  Creating Smog kernel '%s' on thread #%zu\n", kernel, tid);
+            printf("    With %s ranged %#zx ... %#zx on buffer #%zu\n",
+                   format_size_string(slice_size), off_start, off_end,
+                   config.threads[i].buffer_id);
+            printf("    At %p ... %p\n", start, end);
 
             options->tid = tid;
             options->slice_start = start;
@@ -194,7 +191,7 @@ int main(int argc, char* argv[]) {
 
             Smog_Kernel *kernel;
             bool first = (tid == 0);
-            switch(config.threads[i].kernel) {
+            switch (config.threads[i].kernel) {
               case KERNEL_LINEARSCAN:
                 kernel = new Linear_Scan(first);
                 break;
@@ -214,8 +211,8 @@ int main(int argc, char* argv[]) {
                 kernel = new Dirty_Pages(first);
                 break;
               default:
-                std::cerr << "Unknown kernel" << std::endl;
-                return -1;
+                fprintf(stderr, "Unknown kernel: %i\n", config.threads[i].kernel);
+                return 1;
             }
 
             kernel->Configure(*options);
@@ -230,7 +227,10 @@ int main(int argc, char* argv[]) {
     // sync with worker threads
     pthread_barrier_wait(&g_initalization_finished);
 
-    std::cout << "initialization finished, starting monitor" << std::endl;
+    printf("\n");
+    printf("initialization finished, starting monitor\n");
+    printf("\n");
+
     monitor_run();
 
     return 0;

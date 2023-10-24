@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = smog
 
-smog_CPPFLAGS = -Isrc/
+smog_CPPFLAGS = -Isrc/ -Wall -Wextra
 smog_LDADD = -lyaml
 
 smog_SOURCES = src/smog.cpp src/smog.h \
