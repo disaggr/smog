@@ -31,13 +31,14 @@ class Smog_Kernel {
       m_slice_start = t_opts.slice_start;
       m_slice_length = t_opts.slice_length;
       m_delay = t_opts.delay;
+      m_target_rate = t_opts.target_rate;
       m_buffer = (struct element*) m_slice_start;
       m_elements = m_slice_length / sizeof(struct element);
   }
   static void* Run(void *kernel) {
       Smog_Kernel *k = (Smog_Kernel*)kernel;
 
-      if (k->m_delay > 0)
+      if (k->m_delay > 0 || k->m_target_rate > 0)
           k->Run();
       else
           k->Run_Unhinged();
@@ -61,6 +62,10 @@ class Smog_Kernel {
 
   void Initialize(bool shuffle);
 
+  void adjust_delay(size_t d) {
+      this->m_delay = d;
+  }
+
  protected:
   virtual void Execute_Kernel() = 0;
   virtual void Execute_Kernel_Unhinged() {
@@ -69,7 +74,8 @@ class Smog_Kernel {
   int m_id;
   void *m_slice_start;
   size_t m_slice_length;
-  size_t m_delay;
+  volatile size_t m_delay;
+  size_t m_target_rate;
   struct element *m_buffer;
   uint64_t m_elements;
   bool m_initialize;

@@ -7,8 +7,7 @@
 #include <pthread.h>
 #include <argp.h>
 
-// globals
-extern size_t g_smog_timeout;
+#include "kernels/kernels.h"
 
 extern pthread_barrier_t g_initalization_finished;
 
@@ -38,11 +37,20 @@ extern struct thread_status_t *g_thread_status;
 extern struct thread_options *g_thread_options;
 extern pthread_t *g_threads;
 
+#ifdef __cplusplus
+class Smog_Kernel;
+extern Smog_Kernel **g_kernels;
+#endif // __cplusplus
+
 struct thread_options {
+    enum kernel kernel;
     int tid;
     void *slice_start;
     size_t slice_length;
     size_t delay;
+    size_t target_rate;
+    size_t adjust_timeout;
+    int adjust_phase;
 };
 
 enum output_format {

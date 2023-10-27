@@ -23,6 +23,8 @@ enum kernel kernel_from_string(const char *s);
 
 const char* kernel_to_string(enum kernel k);
 
+char kernel_to_char(enum kernel k);
+
 #ifdef __cplusplus
 }
 #endif

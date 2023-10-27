@@ -23,14 +23,12 @@
 #include "kernels/cold.h"
 #include "kernels/dirty_pages.h"
 
-// globals
-size_t g_smog_timeout;
-
 // threads
 size_t g_thread_count;
 struct thread_status_t *g_thread_status;
 struct thread_options *g_thread_options;
 pthread_t *g_threads;
+Smog_Kernel **g_kernels;
 
 pthread_barrier_t g_initalization_finished;
 
@@ -139,7 +137,8 @@ int main(int argc, char* argv[]) {
     g_thread_status = (thread_status_t*)malloc(sizeof(*g_thread_status) * g_thread_count);
     g_thread_options = (thread_options*)malloc(sizeof(*g_thread_options) * g_thread_count);
     g_threads = (pthread_t*)malloc(sizeof(*g_threads) * g_thread_count);
-    if (!g_thread_status || !g_thread_options || !g_threads) {
+    g_kernels = (Smog_Kernel**)malloc(sizeof(*g_kernels) * g_thread_count);
+    if (!g_thread_status || !g_thread_options || !g_threads || !g_kernels) {
         perror("malloc");
         return -1;
     }
@@ -184,10 +183,14 @@ int main(int argc, char* argv[]) {
             printf("    At %p ... %p\n", start, end);
             printf("    With delay %zu\n", config.threads[i].delay);
 
+            options->kernel = config.threads[i].kernel;
             options->tid = tid;
             options->slice_start = start;
             options->slice_length = slice_size;
             options->delay = config.threads[i].delay;
+            options->target_rate = config.threads[i].target_rate;
+            options->adjust_timeout = config.threads[i].adjust_timeout;
+            options->adjust_phase = 0; // PHASE_DYNAMIC_RAMP_UP
 
             Smog_Kernel *kernel;
             bool first = (tid == 0);
@@ -216,6 +219,7 @@ int main(int argc, char* argv[]) {
             }
 
             kernel->Configure(*options);
+            g_kernels[tid] = kernel;
 
             pthread_create(thread, NULL, (void*(*)(void*))&Smog_Kernel::Run, kernel);
         }

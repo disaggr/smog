@@ -7,7 +7,6 @@ buffers:
     # describe one or more slices over these buffers
     slices:
       - range: 0...<50%
-      - range: 0...<100%
       - range: 50%...<100%
         group: 8
 
@@ -15,9 +14,9 @@ buffers:
 threads:
   - kernel: random read
     buffer: 0:0
-  - kernel: random read
-    buffer: 0:1
-    group: 7
-  - kernel: dirty pages
-    buffer: 0:2
     group: 8
+  - kernel: dirty pages
+    buffer: 0:1
+    group: 8
+    target_rate: 1000
+    adjust_timeout: 10

@@ -41,3 +41,22 @@ const char* kernel_to_string(enum kernel k) {
             return "unkwnown";
     }
 }
+
+char kernel_to_char(enum kernel k) {
+    switch (k) {
+        case KERNEL_COLD:
+            return 'c';
+        case KERNEL_DIRTYPAGES:
+            return 'd';
+        case KERNEL_LINEARSCAN:
+            return 'l';
+        case KERNEL_POINTERCHASE:
+            return 'p';
+        case KERNEL_RANDOMREAD:
+            return 'r';
+        case KERNEL_RANDOMWRITE:
+            return 'w';
+        default:
+            return '?';
+    }
+}

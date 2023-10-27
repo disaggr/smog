@@ -11,6 +11,7 @@
 #include <fstream>
 
 #include "./smog.h"
+#include "./kernel.h"
 
 int monitor_run() {
     std::ofstream csv_file;
@@ -26,7 +27,6 @@ int monitor_run() {
     size_t monitor_interval = arguments.monitor_interval;  // ms
 
     size_t monitor_ticks = 0;
-    int phase = PHASE_DYNAMIC_RAMP_UP;
 
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::steady_clock::time_point prev = start;
@@ -45,93 +45,80 @@ int monitor_run() {
             g_thread_status[i].last_count = g_thread_status[i].count;
 
             sum += work_items;
-            // FIXME
-            //std::cout << "[" << i << "] " << kernels[i] << " " << work_items << " iterations";
+            std::cout << "[" << i << "] " << kernel_to_char(g_thread_options[i].kernel) << " " << work_items << " iterations";
             std::cout << " at " << (work_items * 1.0 / elapsed.count()) << " iterations/s, elapsed: " << elapsed.count() * 1000 << " ms";
             std::cout << ", " << (work_items * 1.0 / elapsed.count() * CACHE_LINE_SIZE / 1024 / 1024) << " MiB/s";
-            std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds" << std::endl;
+            std::cout << ", per iteration: " << elapsed.count() * 1000000000 / work_items << " nanoseconds";
 
             if (csv_file.is_open())
               csv_file << i << "," << work_items << ","<< elapsed.count() << std::endl;
+
+            double current_rate = work_items * 1.0 / elapsed.count();
+            if (g_thread_options[i].target_rate) {
+                std::cout << " (" << (100.0 * current_rate / g_thread_options[i].target_rate) << "%)";
+
+                // assuming a linear relationship between delay and dirty rate, the following equation holds:
+                //
+                //  current rate      target delay
+                //  ------------  =  -------------
+                //   target rate     current delay
+                //
+                // consequently, we can compensate for a deviation from the target dirty rate by adjusting
+                // the new delay value to:
+                //
+                //                 current rate
+                //  target delay = ------------ * current delay
+                //                  target rate
+                //
+                // assuming that all values are > 0.
+                // for a smoother transition, we will adjust the new delay to:
+                //
+                //              current delay + target delay
+                //  new delay = ----------------------------
+                //                           2
+                //
+                // However, for a faster initial approximation, the ramp up phase is applied without smoothing,
+                // until an epsilon of 0.05 tolerance is achieved.
+                //
+                size_t target_rate = g_thread_options[i].target_rate;
+                size_t current_delay = g_thread_options[i].delay;
+
+                double target_delay = current_rate * current_delay / target_rate;
+
+                if (g_thread_options[i].adjust_phase < PHASE_CONSTANT_DELAY) {
+
+                    if (g_thread_options[i].adjust_phase == PHASE_DYNAMIC_RAMP_UP) {
+                        double epsilon = 0.05;
+                        if (abs(target_delay - current_delay) < target_delay * epsilon) {
+                            std::cout << "  reached target range after " << monitor_ticks << " ticks" << std::endl;
+                            g_thread_options[i].adjust_phase = PHASE_STEADY_ADJUST;
+                        }
+                    }
+
+                    if (g_thread_options[i].adjust_phase == PHASE_DYNAMIC_RAMP_UP) {
+                        g_thread_options[i].delay = std::max(target_delay, 1.0);
+                    } else {
+                        g_thread_options[i].delay = std::max((target_delay + current_delay) / 2.0, 1.0);
+                    }
+                    g_kernels[i]->adjust_delay(g_thread_options[i].delay);
+
+                    std::cout << "  adjusting delay: " << current_delay << " -> " << g_thread_options[i].delay << " (by " << (int)(g_thread_options[i].delay - current_delay) << ")" << std::endl;
+
+                    std::chrono::duration<double> total_elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start);
+                    if (g_thread_options[i].adjust_timeout > 0 && total_elapsed >= std::chrono::seconds(g_thread_options[i].adjust_timeout)) {
+                        std::cout << "  reached adjustment timeout after " << monitor_ticks << " ticks" << std::endl;
+                        g_thread_options[i].adjust_phase = PHASE_CONSTANT_DELAY;
+                    }
+                }
+            }
+
+            std::cout << std::endl;
         }
         double current_rate = sum * 1.0 / elapsed.count();
         std::cout << "total: " << sum << " cache lines";
         std::cout << " at " << current_rate << " cache lines/s";
         std::cout << ", " << (sum * 1.0 / elapsed.count() * CACHE_LINE_SIZE / 1024 / 1024) << " MiB/s";
-        // FIXME: auto adjustment per thread
-        //if (target_rate) {
-        //    std::cout << " (" << (100.0 * current_rate / target_rate) << "%)";
-        //}
-        std::cout << ", per item: " << elapsed.count() * 1000000000 / sum * g_thread_count << " nanoseconds";
-        // FIXME: overpaging
-        //if (current_rate > smog_pages) {
-        //
-        //    // If the rate of pages/s exceeds the amount of available pages, then pages are touched
-        //    // multiple times per second. this changes the effectiveness of the smog dirty rate and
-        //    // is reported as a metric of 'overpaging', if present.
-        //    //
-        //    // Overpaging in this context is a percentage of pages touched per second in the last
-        //    // measuring interval that exceed the number of allocated pages for dirtying.
-        //    //
-        //    // For example, a smog run on 10000 allocated pages that touched 20000 pages per second
-        //    // would be reported as 100% overpaging by the code below.
-        //    std::cout << ", Overpaging: " << (100.0 * (current_rate / smog_pages - 1)) << "%";
-        //}
-        std::cout << std::endl;
-
-        // FIXME: auto adjust
-        // if (target_rate) {
-        //     // assuming a linear relationship between delay and dirty rate, the following equation holds:
-        //     //
-        //     //  current rate      target delay
-        //     //  ------------  =  -------------
-        //     //   target rate     current delay
-        //     //
-        //     // consequently, we can compensate for a deviation from the target dirty rate by adjusting
-        //     // the new delay value to:
-        //     //
-        //     //                 current rate
-        //     //  target delay = ------------ * current delay
-        //     //                  target rate
-        //     //
-        //     // assuming that all values are > 0.
-        //     // for a smoother transition, we will adjust the new delay to:
-        //     //
-        //     //              current delay + target delay
-        //     //  new delay = ----------------------------
-        //     //                           2
-        //     //
-        //     // However, for a faster initial approximation, the ramp up phase is applied without smoothing,
-        //     // until an epsilon of 0.05 tolerance is achieved.
-        //     //
-        //     size_t current_delay = g_smog_delay;
-        //     double target_delay = current_rate * current_delay / target_rate;
-
-        //     if (phase < PHASE_CONSTANT_DELAY) {
-
-        //         if (phase == PHASE_DYNAMIC_RAMP_UP) {
-        //             double epsilon = 0.05;
-        //             if (abs(target_delay - current_delay) < target_delay * epsilon) {
-        //                 std::cout << "  reached target range after " << monitor_ticks << " ticks" << std::endl;
-        //                 phase = PHASE_STEADY_ADJUST;
-        //             }
-        //         }
-
-        //         if (phase == PHASE_DYNAMIC_RAMP_UP) {
-        //             g_smog_delay = std::max(target_delay, 1.0);
-        //         } else {
-        //             g_smog_delay = std::max((target_delay + current_delay) / 2.0, 1.0);
-        //         }
-
-        //         std::cout << "  adjusting delay: " << current_delay << " -> " << g_smog_delay << " (by " << (int)(g_smog_delay - current_delay) << ")" << std::endl;
-
-        //         std::chrono::duration<double> total_elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start);
-        //         if (g_smog_timeout > 0 && total_elapsed >= std::chrono::seconds(g_smog_timeout)) {
-        //             std::cout << "  reached adjustment timeout after " << monitor_ticks << " ticks" << std::endl;
-        //             phase = PHASE_CONSTANT_DELAY;
-        //         }
-        //     }
-        // }
+        std::cout << ", per item: " << elapsed.count() * 1000000000 / sum * g_thread_count << " nanoseconds" << std::endl;
 
         monitor_ticks++;
     }

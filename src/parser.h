@@ -37,6 +37,8 @@ struct yaml_thread {
     size_t buffer_id;
     size_t slice_id;
     size_t delay;
+    size_t target_rate;
+    size_t adjust_timeout;
     size_t group;
     struct yaml_slice *slice;
 };

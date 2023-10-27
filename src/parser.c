@@ -25,6 +25,8 @@ enum key {
     KEY_KERNEL,
     KEY_BUFFER,
     KEY_DELAY,
+    KEY_TARGET_RATE,
+    KEY_ADJUST_TIMEOUT,
 };
 
 enum context {
@@ -122,6 +124,8 @@ struct parsed_thread {
     size_t buffer_id;
     size_t slice_id;
     size_t delay;
+    size_t target_rate;
+    size_t adjust_timeout;
     size_t group;
 };
 
@@ -313,6 +317,12 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             } else if (!strcmp(value, "group")) {
                                 state->key = KEY_GROUP;
                                 state->state = STATE_EXPECT_SCALAR;
+                            } else if (!strcmp(value, "target_rate")) {
+                                state->key = KEY_TARGET_RATE;
+                                state->state = STATE_EXPECT_SCALAR;
+                            } else if (!strcmp(value, "adjust_timeout")) {
+                                state->key = KEY_ADJUST_TIMEOUT;
+                                state->state = STATE_EXPECT_SCALAR;
                             } else {
                                 parser_error(parser, event, "Unrecognized key: %s", value);
                                 return 0;
@@ -397,6 +407,8 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             t->buffer_id = state->thread.buffer_id;
                             t->slice_id = state->thread.slice_id;
                             t->delay = state->thread.delay;
+                            t->target_rate = state->thread.target_rate;
+                            t->adjust_timeout = state->thread.adjust_timeout;
                             t->group = state->thread.group;
                             state->state = STATE_LIST;
                             break;
@@ -468,7 +480,7 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             break;
                         case CONTEXT_SLICE:
                             // clear the context's slice
-                            memset(&state->slice, 0, sizeof(state->thread));
+                            memset(&state->slice, 0, sizeof(state->slice));
                             // add a new slice object to the buffer
                             b = state->config->buffers + state->config->nbuffers - 1;
                             LIST_PUSH(*b, slices);
@@ -675,6 +687,47 @@ static int consume_event(yaml_parser_t *parser, struct parser_state *state, yaml
                             }
                             break;
 
+                        case KEY_TARGET_RATE:
+                            // the target rate is a single integer
+                            errno = 0;
+                            size_t rate = strtoll(value, NULL, 0);
+                            if (errno != 0) {
+                                parser_error(parser, event, "invalid target_rate: %s", value);
+                                return 0;
+                            }
+
+                            switch (state->context) {
+                                case CONTEXT_THREAD:
+                                    state->thread.target_rate = rate;
+                                    break;
+                                default:
+                                    parser_error(parser, event, "%s does not apply to %s",
+                                                 key_str(state->key),
+                                                 context_str(state->context));
+                                    return 0;
+                            }
+                            break;
+
+                        case KEY_ADJUST_TIMEOUT:
+                            // the adjust timeout is a single integer
+                            errno = 0;
+                            size_t timeout = strtoll(value, NULL, 0);
+                            if (errno != 0) {
+                                parser_error(parser, event, "invalid adjust_timeout: %s", value);
+                                return 0;
+                            }
+
+                            switch (state->context) {
+                                case CONTEXT_THREAD:
+                                    state->thread.adjust_timeout = timeout;
+                                    break;
+                                default:
+                                    parser_error(parser, event, "%s does not apply to %s",
+                                                 key_str(state->key),
+                                                 context_str(state->context));
+                                    return 0;
+                            }
+                            break;
 
                         default:
                             parser_error(parser, event, "Unrecognized key: %d", state->key);
