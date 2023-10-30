@@ -16,3 +16,8 @@ configure~
 .dirstamp
 
 data/
+
+# bison generated files
+src/parser.h
+src/parser.c
+

@@ -190,7 +190,7 @@ int main(int argc, char* argv[]) {
             options->delay = config.threads[i].delay;
             options->target_rate = config.threads[i].target_rate;
             options->adjust_timeout = config.threads[i].adjust_timeout;
-            options->adjust_phase = 0; // PHASE_DYNAMIC_RAMP_UP
+            options->adjust_phase = 0;  // PHASE_DYNAMIC_RAMP_UP
 
             Smog_Kernel *kernel;
             bool first = (tid == 0);

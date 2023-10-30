@@ -40,7 +40,7 @@ extern pthread_t *g_threads;
 #ifdef __cplusplus
 class Smog_Kernel;
 extern Smog_Kernel **g_kernels;
-#endif // __cplusplus
+#endif  // __cplusplus
 
 struct thread_options {
     enum kernel kernel;
