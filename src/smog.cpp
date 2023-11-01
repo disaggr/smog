@@ -8,34 +8,24 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include <cerrno>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-
 #include "./util.h"
+#include "./args.h"
 #include "./parser.h"
 #include "./monitor.h"
-#include "kernels/linear_scan.h"
-#include "kernels/random_access.h"
-#include "kernels/random_write.h"
-#include "kernels/pointer_chase.h"
-#include "kernels/cold.h"
-#include "kernels/dirty_pages.h"
+#include "./kernels/all.h"
 
-// threads
+// thread globals
 size_t g_thread_count;
-struct thread_status_t *g_thread_status;
-struct thread_options *g_thread_options;
 pthread_t *g_threads;
 Smog_Kernel **g_kernels;
+struct thread_status_t *g_thread_status;
+struct thread_options *g_thread_options;
 
+// shared barrier for initialization
 pthread_barrier_t g_initalization_finished;
 
-// defaults
+// defaults for cli arguments
 struct arguments arguments = { 0, 1000, PLAIN, NULL, NULL, 0 };
-
-extern struct argp argp;
 
 int main(int argc, char* argv[]) {
     // determine system characteristics
@@ -44,9 +34,8 @@ int main(int argc, char* argv[]) {
     size_t cache_line_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
     size_t hardware_concurrency = sysconf(_SC_NPROCESSORS_ONLN);
 
-    arguments.pagesize = system_pagesize;
-
     // parse CLI options
+    arguments.pagesize = system_pagesize;
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
     printf("SMOG dirty-page benchmark\n");
@@ -73,9 +62,9 @@ int main(int argc, char* argv[]) {
     }
 
     // parse smogfile
-    struct yaml_config config = { NULL, 0, NULL, 0 };
+    struct yaml_config config = { };
     int res = yaml_parse(arguments.smogfile, &config);
-    if (res) {
+    if (res != 0) {
         fprintf(stderr, "error: failed to parse %s.\n", arguments.smogfile);
         return res;
     }

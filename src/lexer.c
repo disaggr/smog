@@ -38,7 +38,7 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state) {
         yyloc->last_line = state->parser.problem_mark.line;
         yyloc->last_column = state->parser.problem_mark.column;
 
-        yyerror(yyloc, state, NULL, "..TODO..");
+        yyerror(yyloc, state, "..TODO..");
         return YYerror;
     }
 
@@ -62,7 +62,7 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state) {
     int next_scalar_is_value = state->next_scalar_is_value;
     state->next_scalar_is_value = 0;
 
-    switch(event.type) {
+    switch (event.type) {
         case YAML_STREAM_START_EVENT:
             ret = YAML_STREAM_START;
             break;
@@ -121,7 +121,7 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state) {
                 } else {
                     ret = YYUNDEF;
                 }
-                state->next_scalar_is_value = 1; 
+                state->next_scalar_is_value = 1;
             }
             break;
         case YAML_NO_EVENT:
@@ -130,14 +130,13 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state) {
         default:
             ret = YYUNDEF;
             break;
-    } 
+    }
 
     yaml_event_delete(&event);
     return ret;
 }
 
-void yyerror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *config, char const *s) {
-    (void)config;
+void yyerror(YYLTYPE *loc, struct parser_state *state, char const *s) {
     (void)state;
 
     fprintf(stderr, "%s:%u:%u: Error: %s\n",
@@ -147,7 +146,7 @@ void yyerror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *confi
             s);
 }
 
-void yyferror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *config, const char *f, ...) {
+void yyferror(YYLTYPE *loc, struct parser_state *state, const char *f, ...) {
     char *buf = NULL;
     size_t size = 0;
 
@@ -157,14 +156,14 @@ void yyferror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *conf
     va_end(ap);
 
     if (n < 0) {
-        yyerror(loc, state, config, "invalid error format");
+        yyerror(loc, state, "invalid error format");
         return;
     }
 
     size = (size_t)n + 1;
     buf = malloc(size);
     if (!buf) {
-        yyerror(loc, state, config, "unable to allocate memory");
+        yyerror(loc, state, "unable to allocate memory");
         return;
     }
 
@@ -174,10 +173,10 @@ void yyferror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *conf
 
     if (n < 0) {
         free(buf);
-        yyerror(loc, state, config, "invalid error format");
+        yyerror(loc, state, "invalid error format");
         return;
     }
 
-    yyerror(loc, state, config, buf);
+    yyerror(loc, state, buf);
 }
 

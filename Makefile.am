@@ -10,12 +10,12 @@ smog_LDADD = @LIBYAML_LIBS@
 AM_YFLAGS = -d
 
 smog_SOURCES = src/smog.cpp src/smog.h \
-               src/args.c \
+               src/args.c src/args.h \
                src/util.c src/util.h \
-               src/parser.y \
-               src/lexer.c src/lexer.h \
+               src/parser.y src/lexer.c src/lexer.h \
                src/monitor.cpp src/monitor.h \
                src/kernel.cpp src/kernel.h \
+               src/kernels/all.h \
                src/kernels/kernels.c src/kernels/kernels.h \
                src/kernels/cold.cpp src/kernels/cold.h \
                src/kernels/dirty_pages.cpp src/kernels/dirty_pages.h \

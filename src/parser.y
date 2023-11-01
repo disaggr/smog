@@ -18,6 +18,7 @@
 struct parser_state {
     yaml_parser_t parser;
     int next_scalar_is_value;
+    struct yaml_config *config;
 };
 
 typedef struct YYLTYPE
@@ -108,7 +109,6 @@ static void buffer_destroy(struct parsed_buffer *b) {
 
 %parse-param { struct parser_state *state }
 %lex-param   { struct parser_state *state }
-%parse-param { struct yaml_config *config }
 
 %union {
     char *value;
@@ -202,6 +202,8 @@ start
         YAML_DOCUMENT_END
       YAML_STREAM_END
       {
+        struct yaml_config *config = state->config;
+
         config->nbuffers = $4.buffers.n;
         config->nthreads = $4.threads.n;
 
@@ -209,7 +211,7 @@ start
         config->threads = calloc($4.threads.n, sizeof(*config->threads));
 
         if (!config->buffers || !config->threads) {
-            yyerror(&@4, state, config, "unable to allocate memory");
+            yyerror(&@4, state, "unable to allocate memory");
             return -1;
         }
 
@@ -224,7 +226,7 @@ start
             b->nslices = pb->slices.n;
             b->slices = calloc(pb->slices.n, sizeof(*b->slices));
             if (!b->slices) {
-                yyerror(&@4, state, config, "unable to allocate memory");
+                yyerror(&@4, state, "unable to allocate memory");
                 return -1;
             }
  
@@ -241,7 +243,7 @@ start
                     errno = 0;
                     size_t percent = strtoll(s->start_str, NULL, 0);
                     if (errno != 0 || percent > 100) {
-                        yyferror(&ps->range_mark, state, config, "invalid percentage: %s",
+                        yyferror(&ps->range_mark, state, "invalid percentage: %s",
                                  s->start_str);
                         return 0;
                     }
@@ -251,7 +253,7 @@ start
                     errno = 0;
                     s->start = parse_size_string(s->start_str);
                     if (errno != 0) {
-                        yyferror(&ps->range_mark, state, config, "invalid size: %s",
+                        yyferror(&ps->range_mark, state, "invalid size: %s",
                                  s->start_str);
                         return 0;
                     }
@@ -269,7 +271,7 @@ start
                     errno = 0;
                     size_t percent = strtoll(end_str, NULL, 0);
                     if (errno != 0 || percent > 100) {
-                        yyferror(&ps->range_mark, state, config, "invalid percentage: %s",
+                        yyferror(&ps->range_mark, state, "invalid percentage: %s",
                                  end_str);
                         return 0;
                     }
@@ -279,7 +281,7 @@ start
                     errno = 0;
                     s->end = parse_size_string(end_str) + offset;
                     if (errno != 0) {
-                        yyferror(&ps->range_mark, state, config, "invalid size: %s",
+                        yyferror(&ps->range_mark, state, "invalid size: %s",
                                  end_str);
                         return 0;
                     }
@@ -303,7 +305,7 @@ start
             t->group = pt->group;
             
             if (pt->buffer_id >= config->nbuffers) {
-                yyferror(&pt->buffer_mark, state, config, "Buffer id out of range: %zu",
+                yyferror(&pt->buffer_mark, state, "Buffer id out of range: %zu",
                          pt->buffer_id);
                 return -1;
             }
@@ -311,7 +313,7 @@ start
             struct yaml_buffer *b = config->buffers + pt->buffer_id;
             
             if (pt->slice_id >= b->nslices) {
-                yyferror(&pt->buffer_mark, state, config, "Slice id out of range: %zu",
+                yyferror(&pt->buffer_mark, state, "Slice id out of range: %zu",
                          pt->slice_id);
                 return -1;
             }
@@ -358,7 +360,7 @@ Buffers
 
         struct parsed_buffer *b = realloc($$.buffers, sizeof(*b) * ($$.n + 1));
         if (!b) {
-            yyerror(&@3, state, config, "unable to allocate memory");
+            yyerror(&@3, state, "unable to allocate memory");
             return -1;
         }
         $$.buffers = b;
@@ -380,7 +382,7 @@ Buffer
         errno = 0;
         size_t size = parse_size_string($3);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid size: %s", $3);
+            yyferror(&@3, state, "invalid size: %s", $3);
             return -1;
         }
         free($3);
@@ -422,7 +424,7 @@ Slices
 
         struct parsed_slice *s = realloc($$.slices, sizeof(*s) * ($$.n + 1));
         if (!s) {
-            yyerror(&@3, state, config, "unable to allocate memory");
+            yyerror(&@3, state, "unable to allocate memory");
             return -1;
         }
         $$.slices = s;
@@ -446,7 +448,7 @@ Slice
         // we store this as string now and convert later when the buffer is parsed
         char *p = strstr($3, "...");
         if (!p) {
-            yyferror(&@3, state, config, "invalid range: %s", $3);
+            yyferror(&@3, state, "invalid range: %s", $3);
             return -1;
         }
 
@@ -466,7 +468,7 @@ Slice
         errno = 0;
         size_t group = strtoll($3, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid group: %s", $3);
+            yyferror(&@3, state, "invalid group: %s", $3);
             return -1;
         }
         free($3);
@@ -486,7 +488,7 @@ Threads
 
         struct parsed_thread *t = realloc($$.threads, sizeof(*t) * ($$.n + 1));
         if (!t) {
-            yyerror(&@3, state, config, "unable to allocate memory");
+            yyerror(&@3, state, "unable to allocate memory");
             return -1;
         }
         $$.threads = t;
@@ -507,7 +509,7 @@ Thread
         // the kernel is a string literal we can map to an enum
         enum kernel kernel = kernel_from_string($3);
         if (kernel == KERNEL_UNKNOWN) {
-            yyferror(&@3, state, config, "Unrecognized kernel: %s", $3);
+            yyferror(&@3, state, "Unrecognized kernel: %s", $3);
             return -1;
         }
         free($3);
@@ -520,7 +522,7 @@ Thread
         // the buffer is a tuple of buffer_id and slice_id
         char *p = strchr($3, ':');
         if (!p) {
-            yyferror(&@3, state, config, "invalid buffer: %s", $3);
+            yyferror(&@3, state, "invalid buffer: %s", $3);
             return -1;
         }
         char *s_buffer_id = $3;
@@ -530,13 +532,13 @@ Thread
         errno = 0;
         size_t buffer_id = strtoll(s_buffer_id, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid buffer id: %s", s_buffer_id);
+            yyferror(&@3, state, "invalid buffer id: %s", s_buffer_id);
             return -1;
         }
         errno = 0;
         size_t slice_id = strtoll(s_slice_id, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid slice id: %s", s_slice_id);
+            yyferror(&@3, state, "invalid slice id: %s", s_slice_id);
             return -1;
         }
         free($3);
@@ -551,7 +553,7 @@ Thread
         errno = 0;
         size_t delay = strtoll($3, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid delay: %s", $3);
+            yyferror(&@3, state, "invalid delay: %s", $3);
             return -1;
         }
         free($3);
@@ -565,7 +567,7 @@ Thread
         errno = 0;
         size_t group = strtoll($3, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid group: %s", $3);
+            yyferror(&@3, state, "invalid group: %s", $3);
             return -1;
         }
         free($3);
@@ -579,7 +581,7 @@ Thread
         errno = 0;
         size_t target_rate = strtoll($3, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid target_rate: %s", $3);
+            yyferror(&@3, state, "invalid target_rate: %s", $3);
             return -1;
         }
         free($3);
@@ -593,7 +595,7 @@ Thread
         errno = 0;
         size_t adjust_timeout = strtoll($3, NULL, 0);
         if (errno != 0) {
-            yyferror(&@3, state, config, "invalid adjust_timeout: %s", $3);
+            yyferror(&@3, state, "invalid adjust_timeout: %s", $3);
             return -1;
         }
         free($3);
@@ -619,8 +621,8 @@ int yaml_parse(const char *file, struct yaml_config *config) {
     yaml_parser_initialize(&parser);
     yaml_parser_set_input_file(&parser, f);
 
-    struct parser_state state = { parser, 0 };
-    int res = yyparse(&state, config);
+    struct parser_state state = { parser, 0, config };
+    int res = yyparse(&state);
 
     yaml_parser_delete(&parser);
 

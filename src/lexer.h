@@ -9,9 +9,9 @@
 
 int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state);
 
-void yyerror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *config, char const *s);
+void yyerror(YYLTYPE *loc, struct parser_state *state, char const *s);
 
-void yyferror(YYLTYPE *loc, struct parser_state *state, struct yaml_config *config, char const *f, ...);
+void yyferror(YYLTYPE *loc, struct parser_state *state, char const *f, ...);
 
 
 #endif  // LEXER_H_

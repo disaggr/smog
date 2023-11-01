@@ -2,7 +2,8 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#include <argp.h>
+#include "./args.h"
+
 #include <stdlib.h>
 
 #include "./util.h"
