@@ -1,14 +1,13 @@
 
 AC_INIT([smog], [0.1])
 
-AC_CONFIG_SRCDIR([src/smog.cpp])
+AC_CONFIG_SRCDIR([src/smog.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 AC_PROG_CC
-AC_PROG_CXX
 AX_PROG_BISON
 
 PKG_CHECK_MODULES(LIBYAML, [ yaml-0.1 ])

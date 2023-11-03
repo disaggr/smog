@@ -2,18 +2,13 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#pragma once
+#ifndef KERNELS_LINEAR_SCAN_H_
+#define KERNELS_LINEAR_SCAN_H_
 
-#include <cstdint>
+#include "../kernel.h"
 
-#include "./smog.h"
-#include "./kernel.h"
+void linear_scan_run(struct smog_thread *thread);
 
-class Linear_Scan : public Smog_Kernel {
- public:
-  explicit Linear_Scan(bool initialize) : Smog_Kernel(initialize, false) {}
+void linear_scan_run_unhinged(struct smog_thread *thread);
 
- protected:
-  void Execute_Kernel() override;
-  void Execute_Kernel_Unhinged() override;
-};
+#endif  // KERNELS_LINEAR_SCAN_H_

@@ -2,17 +2,19 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#pragma once
+#ifndef KERNELS_RANDOM_ACCESS_H_
+#define KERNELS_RANDOM_ACCESS_H_
 
-#include <cstdint>
+#include "../kernel.h"
 
-#include "./smog.h"
-#include "./kernel.h"
+int random_access_init(struct smog_thread *thread);
 
-class Random_Access : public Smog_Kernel {
- public:
-  explicit Random_Access(bool initialize) : Smog_Kernel(initialize, false) {}
+void random_read_run(struct smog_thread *thread);
 
- protected:
-  void Execute_Kernel() override;
-};
+void random_read_run_unhinged(struct smog_thread *thread);
+
+void random_write_run(struct smog_thread *thread);
+
+void random_write_run_unhinged(struct smog_thread *thread);
+
+#endif  // KERNELS_RANDOM_ACCESS_H_

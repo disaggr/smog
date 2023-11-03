@@ -2,22 +2,15 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#pragma once
+#ifndef KERNELS_POINTER_CHASE_H_
+#define KERNELS_POINTER_CHASE_H_
 
-#include <cstdint>
+#include "../kernel.h"
 
-#include "./smog.h"
-#include "./kernel.h"
+int pointer_chase_init(struct smog_thread *thread);
 
-class Pointer_Chase : public Smog_Kernel {
- public:
-  explicit Pointer_Chase(bool initialize) : Smog_Kernel(initialize, true) {}
+void pointer_chase_run(struct smog_thread *thread);
 
- protected:
-  void Execute_Kernel() override;
-  void Execute_Kernel_Unhinged() override;
+void pointer_chase_run_unhinged(struct smog_thread *thread);
 
- private:
-  void Delete_Node(struct node *index);
-  void Insert_Node(struct node *index, struct node *insertee);
-};
+#endif  // KERNELS_POINTER_CHASE_H_

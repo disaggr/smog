@@ -160,7 +160,7 @@ void yyferror(YYLTYPE *loc, struct parser_state *state, const char *f, ...) {
         return;
     }
 
-    size = (size_t)n + 1;
+    size = n + 1;
     buf = malloc(size);
     if (!buf) {
         yyerror(loc, state, "unable to allocate memory");

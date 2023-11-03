@@ -2,15 +2,11 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#pragma once
+#ifndef KERNELS_COLD_H_
+#define KERNELS_COLD_H_
 
-#include "./smog.h"
-#include "./kernel.h"
+#include "../kernel.h"
 
-class Cold : public Smog_Kernel {
- public:
-  explicit Cold(bool initialize) : Smog_Kernel(initialize, false) {}
+void cold_run(struct smog_thread *thread);
 
- protected:
-  void Execute_Kernel() override;
-};
+#endif  // KERNELS_COLD_H_

@@ -23,18 +23,12 @@
   REP##TENS(REP10(X)) \
   REP##ONES(X)
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define TIMESPEC_FROM_MILLIS(M) { (M) / 1000, ((M) % 1000) * 1000000 }
 
 long double get_unixtime(void);
 
 size_t parse_size_string(const char *s);
 
 const char *format_size_string(size_t s);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif  // UTIL_H_

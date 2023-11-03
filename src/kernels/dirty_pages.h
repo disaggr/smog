@@ -2,15 +2,13 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#pragma once
+#ifndef KERNELS_DIRTY_PAGES_H_
+#define KERNELS_DIRTY_PAGES_H_
 
-#include "./smog.h"
-#include "./kernel.h"
+#include "../kernel.h"
 
-class Dirty_Pages : public Smog_Kernel {
- public:
-  explicit Dirty_Pages(bool initialize) : Smog_Kernel(initialize, false) {}
+void dirty_pages_run(struct smog_thread *thread);
 
- protected:
-  void Execute_Kernel() override;
-};
+void dirty_pages_run_unhinged(struct smog_thread *thread);
+
+#endif  // KERNELS_DIRTY_PAGES_H_

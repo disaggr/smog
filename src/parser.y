@@ -13,7 +13,7 @@
 
 #include <yaml.h>
 
-#include "kernels/kernels.h"
+#include "./kerneltypes.h"
 
 struct parser_state {
     yaml_parser_t parser;
@@ -67,15 +67,7 @@ struct yaml_thread {
 
 %code provides {
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 int yaml_parse(const char *file, struct yaml_config *config);
-
-#ifdef __cplusplus
-}
-#endif
 
 }
 
@@ -85,10 +77,12 @@ int yaml_parse(const char *file, struct yaml_config *config);
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <errno.h>
 
 #include "./lexer.h"
 #include "./smog.h"
 #include "./util.h"
+#include "./kernel.h"
 
 static void thread_destroy(struct parsed_thread *t) {
     (void)t;  // noop;
@@ -507,7 +501,7 @@ Thread
         $$ = $1;
 
         // the kernel is a string literal we can map to an enum
-        enum kernel kernel = kernel_from_string($3);
+        enum kernel kernel = kerneltype_from_string($3);
         if (kernel == KERNEL_UNKNOWN) {
             yyferror(&@3, state, "Unrecognized kernel: %s", $3);
             return -1;

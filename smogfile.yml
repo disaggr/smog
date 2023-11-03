@@ -19,4 +19,4 @@ threads:
     buffer: 0:1
     group: 8
     target_rate: 1000
-    adjust_timeout: 10
+    adjust_timeout: 10 # seconds

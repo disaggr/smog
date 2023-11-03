@@ -2,86 +2,31 @@
  * Copyright (c) 2022 - 2023 OSM Group @ HPI, University of Potsdam
  */
 
-#pragma once
+#ifndef KERNEL_H_
+#define KERNEL_H_
 
-#include <stdint.h>
+#include "./thread.h"
+#include "./kerneltypes.h"
 
-#include "./smog.h"
+typedef void(*kernel_run_f)(struct smog_thread*);
+typedef int(*kernel_init_f)(struct smog_thread*);
 
-#define PARALLEL_ACCESSES 4
+struct smog_kernel {
+    enum kernel kernel;
+    const char *name;
+    char short_name;
 
-struct element {
-    union {
-        struct {
-            uint64_t index;
-            struct element *next;
-            struct element *prev;
-            uint64_t randoms[PARALLEL_ACCESSES];
-            uint64_t scratch;
-        };
-        char padding[CACHE_LINE_SIZE];
-    };
+    kernel_run_f run;
+    kernel_run_f run_unhinged;
+    kernel_init_f init;
 };
 
-class Smog_Kernel {
- public:
-  Smog_Kernel(bool initialize, bool shuffle) : m_initialize(initialize), m_shuffle(shuffle) {}
-  void Configure(thread_options t_opts) {
-      m_id = t_opts.tid;
-      m_slice_start = t_opts.slice_start;
-      m_slice_length = t_opts.slice_length;
-      m_delay = t_opts.delay;
-      m_target_rate = t_opts.target_rate;
-      m_buffer = (struct element*) m_slice_start;
-      m_elements = m_slice_length / sizeof(struct element);
-  }
-  static void* Run(void *kernel) {
-      Smog_Kernel *k = (Smog_Kernel*)kernel;
+extern struct smog_kernel smog_kernels[];
 
-      if (k->m_delay > 0 || k->m_target_rate > 0)
-          k->Run();
-      else
-          k->Run_Unhinged();
+enum kernel kerneltype_from_string(const char *s);
 
-      return NULL;
-  }
-  void Run() {
-      if (m_initialize) {
-          Initialize(m_shuffle);
-      }
-      pthread_barrier_wait(&g_initalization_finished);
-      Execute_Kernel();
-  }
-  void Run_Unhinged() {
-      if (m_initialize) {
-          Initialize(m_shuffle);
-      }
-      pthread_barrier_wait(&g_initalization_finished);
-      Execute_Kernel_Unhinged();
-  }
+const char* kernel_to_string(enum kernel k);
 
-  void Initialize(bool shuffle);
+char kernel_to_char(enum kernel k);
 
-  void adjust_delay(size_t d) {
-      this->m_delay = d;
-  }
-
- protected:
-  virtual void Execute_Kernel() = 0;
-  virtual void Execute_Kernel_Unhinged() {
-      Execute_Kernel();
-  }
-  int m_id;
-  void *m_slice_start;
-  size_t m_slice_length;
-  volatile size_t m_delay;
-  size_t m_target_rate;
-  struct element *m_buffer;
-  uint64_t m_elements;
-  bool m_initialize;
-  bool m_shuffle;
-
- private:
-  void Delete_Node(struct element *index);
-  void Insert_Node(struct element *index, struct element *insertee);
-};
+#endif  // KERNEL_H_
