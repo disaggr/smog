@@ -11,7 +11,7 @@
 
 static int thread_run_kernel(struct smog_thread *thread, struct smog_kernel *kernel) {
     // perform initializion on the slice, if necessary
-    if (kernel->init) {
+    if (thread->is_principal && kernel->init) {
         int res = kernel->init(thread);
         if (res != 0) {
             fprintf(stderr, "error: kernel initialization failed\n");

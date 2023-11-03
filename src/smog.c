@@ -139,6 +139,7 @@ int main(int argc, char* argv[]) {
             thread->adjust_phase = PHASE_DYNAMIC_RAMP_UP;
             thread->init = &init;
             thread->seed = rand();
+            thread->is_principal = (j == 0);
 
             off_t off_start = slice->start;
             off_t off_end = slice->end;

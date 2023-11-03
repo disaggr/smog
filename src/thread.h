@@ -38,6 +38,8 @@ struct smog_thread {
 
     pthread_barrier_t *init;
     unsigned int seed;
+
+    int is_principal;
 };
 
 void* thread_run(void *arg);
