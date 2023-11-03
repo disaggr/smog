@@ -4,8 +4,8 @@ AUTOMAKE_OPTIONS = subdir-objects
 bin_PROGRAMS = smog
 
 smog_CPPFLAGS = -Isrc/ -Wall -Wextra
-smog_CFLAGS = @LIBYAML_CFLAGS@
-smog_LDADD = @LIBYAML_LIBS@
+smog_CFLAGS = @LIBYAML_CFLAGS@ @PTHREAD_CFLAGS@
+smog_LDADD = @LIBYAML_LIBS@ @PTHREAD_LIBS@
 AM_YFLAGS = -d
 
 smog_SOURCES = src/smog.c src/smog.h \

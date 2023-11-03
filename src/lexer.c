@@ -62,6 +62,8 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state) {
     int next_scalar_is_value = state->next_scalar_is_value;
     state->next_scalar_is_value = 0;
 
+    char *value = NULL;
+
     switch (event.type) {
         case YAML_STREAM_START_EVENT:
             ret = YAML_STREAM_START;
@@ -88,7 +90,7 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yyloc, struct parser_state *state) {
             ret = YAML_SEQUENCE_END;
             break;
         case YAML_SCALAR_EVENT:
-            char *value = (char*)event.data.scalar.value;
+            value = (char*)event.data.scalar.value;
 
             if (next_scalar_is_value) {
                 ret = YAML_SCALAR;
