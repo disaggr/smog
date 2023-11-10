@@ -31,10 +31,10 @@ void random_read_run(struct smog_thread *thread) {
 
     while (1) {
         for (uint64_t i = 0; i < limit; i++) {
-            *(elements + elements[i].randoms[0] % limit);
-            *(elements + elements[i].randoms[1] % limit);
-            *(elements + elements[i].randoms[2] % limit);
-            *(elements + elements[i].randoms[3] % limit);
+            (elements + elements[i].randoms[0] % limit)->scratch;
+            (elements + elements[i].randoms[1] % limit)->scratch;
+            (elements + elements[i].randoms[2] % limit)->scratch;
+            (elements + elements[i].randoms[3] % limit)->scratch;
 
             status->count += 4;
 

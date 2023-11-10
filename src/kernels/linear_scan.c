@@ -18,7 +18,7 @@ void linear_scan_run(struct smog_thread *thread) {
             // cast to volatile pointer and dereference instructs the compiler to assume that
             // load and store accesses to that variable have side effects, which forces it to
             // emit a load instruction regardless of optimization levels.
-            *((volatile uint64_t*)(words + i));
+            *(volatile uint64_t*)(words + i);
             status->count++;
 
             volatile uint64_t delay = 0;
@@ -38,7 +38,7 @@ void linear_scan_run_unhinged(struct smog_thread *thread) {
     while (1) {
         for (size_t i = 0; i < limit;) {
             // manual loop unrolling, same logic as above
-            REP(0, 5, 1, 2, *((volatile uint64_t*)(words + (i++ % limit)));)
+            REP(0, 5, 1, 2, *(volatile uint64_t*)(words + (i++ % limit));)
             status->count += 512;
         }
     }

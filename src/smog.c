@@ -163,6 +163,12 @@ int main(int argc, char* argv[]) {
             thread->slice.nelements = slice_size / sizeof(*thread->slice.elements);
             thread->slice.nwords = slice_size / sizeof(*thread->slice.words);
 
+            if ((uintptr_t)thread->slice.buffer % sizeof(struct buffer_element)) {
+                fprintf(stderr, "warning: slice start %p is not a multiple of "
+                                "the cache line size %s\n",
+                                start,
+                                format_size_string(CACHE_LINE_SIZE));
+            }
             if (thread->slice.length % sizeof(struct buffer_element)) {
                 fprintf(stderr, "warning: slice size %s is not a multiple of "
                                 "the cache line size %s\n",
