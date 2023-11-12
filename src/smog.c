@@ -170,9 +170,9 @@ int main(int argc, char* argv[]) {
                                 format_size_string(CACHE_LINE_SIZE));
             }
             if (thread->slice.length % sizeof(struct buffer_element)) {
-                fprintf(stderr, "warning: slice size %s is not a multiple of "
-                                "the cache line size %s\n",
-                                format_size_string(slice_size),
+                fprintf(stderr, "warning: slice size %s is not a multiple of ",
+                                format_size_string(slice_size));
+                fprintf(stderr, "the cache line size %s\n",
                                 format_size_string(CACHE_LINE_SIZE));
             }
             if (thread->slice.nelements <= 0) {
